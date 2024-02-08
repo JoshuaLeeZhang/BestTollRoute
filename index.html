@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>Route in Google Map</title>
+
+    </head>
+    <body>
+        <div>
+            <input id="api-key" type="text" placeholder="Enter Google Maps API Key">
+            <button onclick="loadMapScript()">Submit</button>
+        </div>
+        <div>
+            <input id = "origin-lat" type="number" placeholder = "Origin Latitude">
+            <input id = "origin-lng" type="number" placeholder = "Origin Longitude">
+            <input id = "destination-lat" type="number" placeholder = "Destination Latitude">
+            <input id = "destination-lng" type="number" placeholder = "Destination Longitude">
+            <button onclick="updateRoute()"> Create Map </button>
+        </div>
+        <div id = "map" style = "width:100%; height:800px;"></div>
+        <script src = "app.js"></script>
+    </body>     
+</html>
