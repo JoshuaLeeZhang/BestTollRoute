@@ -19,8 +19,6 @@ function initMap() {
     });
 }
 
-
-
 var originCoords;
 var destinationCoords;
 
