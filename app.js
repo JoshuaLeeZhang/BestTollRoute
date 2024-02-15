@@ -95,6 +95,7 @@ function createMap(origin, destination) {
     );
 }
 
+
 function travelTime(directionsResult) {
   var travelTime = document.getElementById("travelTime");
   travelTime.innerHTML = '';
@@ -104,42 +105,85 @@ function travelTime(directionsResult) {
   travelTime.innerHTML += '<p>' + directionsResult.routes[0].legs[0].duration.text + '</p>';
 }
 
-function displayInstructions(directionsResult) {
+async function displayInstructions(directionsResult) {
   var DirectionInstructions = document.getElementById("DirectionInstructions");
   DirectionInstructions.innerHTML = '';
 
-  for (var j = 0; j < directionsResult.routes[0].legs[0].steps.length; j++) {
-    var instruction = directionsResult.routes[0].legs[0].steps[j].instructions;
-    var lat = directionsResult.routes[0].legs[0].steps[j].start_location.lat();
-    var lng = directionsResult.routes[0].legs[0].steps[j].start_location.lng();
-    DirectionInstructions.innerHTML += '<p>' + instruction + " ";
-    DirectionInstructions.innerHTML += lat + "," + lng + '</p>';
+  var counter = 0;
+  var Start407;
+  var End407;
+  var Start407Coords;
+  var End407Coords
 
-    // if (counter == 0) {
-    //   if (isToll(instruction)) {
-    //     counter++;
-    //   } else {
-    //     start407 = extractStreetName(instruction);
-    //   }
-    // }
-    // if (counter == 1) {
-    //   if (!isToll(instruction)) counter++;
-    //   end407 = extractStreetName(instruction);
-    // }
+  for (var j = 0; j < directionsResult.routes[0].legs[0].steps.length; j++) {
+    var condense = directionsResult.routes[0].legs[0].steps[j];
+    var instruction = condense.instructions;
+    var currLat = condense.start_location.lat();
+    var currLng = condense.start_location.lng();
+    DirectionInstructions.innerHTML += '<p>' + instruction + "   ----------> COORDS ARE: " + currLat + "," + currLng + '</p>';
+    var currentCoords = {lat: currLat, lng: currLng};
+    
+    if (counter == 0) {
+      if (isToll(instruction)) {
+        counter++;
+        DirectionInstructions.innerHTML += '<p>' + "ON TOLL" + '</p>';
+        Start407 = await findMatchingCoords(currentCoords);
+        console.log(Start407.COMMENT);
+        Start407Coords = currentCoords;
+      }
+    }
+    if (counter == 1) {
+      if (!isToll(instruction)) {
+        counter++;
+        DirectionInstructions.innerHTML += '<p>' + "OFF TOLL" + '</p>';
+        End407 = await findMatchingCoords(currentCoords);
+        console.log(End407.COMMENT);
+        End407Coords = currentCoords;
+      }
+    }
+
+    DirectionInstructions.innerHTML += '<p>' + "__________________________________________________" + '</p>';
   }
+
+  calculateTollInfo(Start407Coords, End407Coords);
 }
 
 function areCoordsClose(routeCoords, actualCoords, tolerance) {
-  var distance = sqrt((routeCoords.lat - actualCoords.lat)*(routeCoords.lat - actualCoords.lat) + (routeCoords.lng - actualCoords.lng)*(routeCoords.lng - actualCoords.lng));
+  const earthRadius = 6371;
+
+  const diffLat = degToRad(actualCoords.lat - routeCoords.lat);
+  const diffLng = degToRad(actualCoords.lng - routeCoords.lng);
+
+  const routeLat = degToRad(routeCoords.lat);
+  const actualLat = degToRad(actualCoords.lat);
+
+  var distance = Math.sin(diffLng/2)*Math.sin(diffLng/2) + Math.cos(routeLat)*Math.cos(actualLat)*Math.sin(diffLat/2)*Math.sin(diffLat/2);
+  distance = 2*earthRadius*Math.asin(Math.sqrt(distance));
+
   return distance <= tolerance;
 }
 
-// function extractStreetName(string) {
-//   var parser = new DOMParser();
-//   var doc = parser.parseFromString(string, 'text/html');
-//   var boldElements = doc.querySelectorAll('b');
-//   return boldElements[1].textContent;
-// }
+function degToRad(degree) {
+  return degree * (Math.PI / 180);
+}
+
+async function findMatchingCoords(routeCoords) {
+  const response = await fetch("407Zones.JSON");
+  const data = await response.json();
+
+  const size = data.Coords.length;
+
+  for (var i=0; i<size; i++) {
+    const dataFromJSON = data.Coords[i];
+
+    var jsonCoords = {lat: dataFromJSON.Lat, lng: dataFromJSON.Lng};
+    var tolerance = dataFromJSON.Tol;
+
+    if (areCoordsClose(routeCoords, jsonCoords, tolerance)) {
+      return dataFromJSON;
+    } 
+  }
+}
 
 function isToll(string) {
   var parser = new DOMParser();
@@ -147,10 +191,32 @@ function isToll(string) {
   return doc.body.textContent.includes('Toll road');
 }
 
-let start407;
-let end407;
-var counter = 0; // at 0 is before 407, at 1 is on 407, at 2 is after 407
-  
+function calculateTollInfo (origin, destination) {
+  const directionsService = new google.maps.DirectionsService();
+
+  directionsService.route(
+    {
+      origin: origin,
+      destination: destination,
+      travelMode: google.maps.TravelMode.DRIVING,
+    },
+
+    (response, status) => {
+      if (status === "OK") {
+        var tollInfo = document.getElementById("tollInfo");
+        tollInfo.innerHTML = '';
+
+        var route = response.routes[0];
+
+        tollInfo.innerHTML += '<p>' + "TIME: " + route.legs[0].duration.text + '</p>';
+        tollInfo.innerHTML += '<p>' + "DISTANCE: " + route.legs[0].distance.value + '</p>';
+
+      } else {
+        window.alert("Directions request failed due to " + status);
+      }
+    }
+  );
+}
 
 function updateRoute() {
     createMap(originCoords, destinationCoords);
