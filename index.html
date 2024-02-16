@@ -23,6 +23,12 @@
             <button class="colorButton" onclick = "updateRoute()"> Create Map </button>
         </div>
 
+        <div class="checkbox">
+            <p> Use Toll: </p>
+            <input type="checkbox" id="tollCheckbox" name="tollCheckbox">
+            <label for="tollCheckbox"></label>
+        </div>
+
         <script>
             document.querySelectorAll(".colorButton").forEach(button => {
                 button.addEventListener("click", function() {
@@ -40,5 +46,7 @@
         <div id = "DirectionInstructions"></div>
         
         <script src = "app.js"></script>
+        <script src = "autocomplete.js"></script>
+        <script src = "toll.js"></script>
     </body>     
 </html>

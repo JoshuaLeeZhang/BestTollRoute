@@ -1,0 +1,10 @@
+.checkbox {
+    display: flex;
+    align-items: left;
+}
+
+.checkbox p {
+    margin: 0.2;
+    margin-right: 10px;
+    font-family: Arial, sans-serif;
+}
