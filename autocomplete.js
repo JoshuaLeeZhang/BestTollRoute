@@ -1,5 +1,5 @@
 function initAutocomplete() {
-    var originAutoComplete = new google.maps.places.Autocomplete(
+    const originAutoComplete = new google.maps.places.Autocomplete(
         document.getElementById("origin"), {
           componentRestrictions: {"country": ["CA"]}
         }
@@ -8,7 +8,7 @@ function initAutocomplete() {
       onOriginPlaceChanged(originAutoComplete);
     });
 
-    var destinationAutocomplete = new google.maps.places.Autocomplete(
+    const destinationAutocomplete = new google.maps.places.Autocomplete(
         document.getElementById("destination"), {
           componentRestrictions: {"country": ["CA"]}
         }
@@ -19,23 +19,23 @@ function initAutocomplete() {
 }
 
 function onOriginPlaceChanged(originAutoComplete) {
-  var place = originAutoComplete.getPlace();
+  const place = originAutoComplete.getPlace();
   if (!place.geometry) {
     console.log("OriginError");
   } else {
-    var orgLat = place.geometry.location.lat();
-    var orgLng = place.geometry.location.lng();
+    const orgLat = place.geometry.location.lat();
+    const orgLng = place.geometry.location.lng();
     originCoords = {lat: orgLat, lng: orgLng};
   }
 }
 
 function onDestinationPlaceChanged(destinationAutocomplete) {
-  var place = destinationAutocomplete.getPlace();
+  const place = destinationAutocomplete.getPlace();
   if (!place.geometry) {
     console.log("DestinationError");
   } else {
-    var desLat = place.geometry.location.lat();
-    var desLng = place.geometry.location.lng();
+    const desLat = place.geometry.location.lat();
+    const desLng = place.geometry.location.lng();
     destinationCoords = {lat: desLat, lng: desLng};
   }
 }

@@ -2,7 +2,7 @@ function loadMapScript() {
   const apiKey = document.getElementById('api-key').value;
   
   const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&libraries=places&callback=initGoogleMaps`;
+  script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAaKHa0arLH9YjeKzYU0yc8ILNCBkzFC7U&loading=async&libraries=places&callback=initGoogleMaps`;
 
   document.head.appendChild(script);
 }
@@ -22,10 +22,10 @@ function initMap() {
 let originCoords;
 let destinationCoords;
 let toll = true;
-let eastOrWest; //1 for EAST, 0 for WEST
+let weekend = false;
 
 async function updateRoute() {
-  var calculatedRoute = await createRoute(originCoords, destinationCoords, toll);
+  const calculatedRoute = await createRoute(originCoords, destinationCoords, toll);
   displayRoute(calculatedRoute);
   displayInstructions(calculatedRoute);
   displayTravelTime(calculatedRoute);
@@ -65,41 +65,37 @@ function displayRoute(calculatedRoute) {
 }
 
 function displayTravelTime(directionsResult) {
-  var travelTime = document.getElementById("travelTime");
-  travelTime.innerHTML = '';
-
-  var route = directionsResult.routes[0];
-
-  travelTime.innerHTML += '<p>' + directionsResult.routes[0].legs[0].duration.text + '</p>';
+  const travelTime = document.getElementById("travelTime");
+  travelTime.innerHTML = '<p>' + directionsResult.routes[0].legs[0].duration.text + '</p>';
 }
 
 async function displayInstructions(directionsResult) {
-  var DirectionInstructions = document.getElementById("DirectionInstructions");
+  const DirectionInstructions = document.getElementById("DirectionInstructions");
   DirectionInstructions.innerHTML = '';
 
-  var counter = 0;
-  var Start407;
-  var End407;
-  var Start407Coords;
-  var End407Coords;
+  let counter = 0;
+  let Start407;
+  let End407;
+  let Start407Coords;
+  let End407Coords;
 
-  for (var j = 0; j < directionsResult.routes[0].legs[0].steps.length; j++) {
-    var condense = directionsResult.routes[0].legs[0].steps[j];
+  for (let j = 0; j < directionsResult.routes[0].legs[0].steps.length; j++) {
+    let step = directionsResult.routes[0].legs[0].steps[j];
 
-    var instruction = condense.instructions;
-    var currLat = condense.start_location.lat();
-    var currLng = condense.start_location.lng();
+    let instruction = step.instructions;
+    let currLat = step.start_location.lat();
+    let currLng = step.start_location.lng();
 
     DirectionInstructions.innerHTML += '<p>' + instruction + '</p>';
     
-    console.log(instruction + "COORDS: " + currLat + "," + currLng);
-    var currentCoords = {lat: currLat, lng: currLng};
+    // console.log(instruction + "COORDS: " + currLat + "," + currLng);
+    
+    let currentCoords = {lat: currLat, lng: currLng};
     
     if (counter == 0) {
       if (isToll(instruction)) {
-        goingEastOrWest(instruction);
         Start407 = await findMatchingCoords(currentCoords);
-        console.log(Start407.COMMENT);
+        console.log(Start407.data.COMMENT);
         Start407Coords = currentCoords;
         counter++;
       }
@@ -107,7 +103,7 @@ async function displayInstructions(directionsResult) {
     if (counter == 1) {
       if (!isToll(instruction)) {
         End407 = await findMatchingCoords(currentCoords);
-        console.log(End407.COMMENT);
+        console.log(End407.data.COMMENT);
         End407Coords = currentCoords;
         counter++;
       }
@@ -120,9 +116,14 @@ async function displayInstructions(directionsResult) {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-  var checkbox = document.getElementById("tollCheckbox");
+  let tollCheckbox = document.getElementById("tollCheckbox");
+  let weekendCheckbox = document.getElementById("weekendCheckbox")
 
-  checkbox.addEventListener("change", function() {
+  tollCheckbox.addEventListener("change", function() {
     toll = this.checked;
+  })
+
+  weekendCheckbox.addEventListener("change", function() {
+    weekend = this.checked;
   })
 })

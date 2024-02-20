@@ -6,6 +6,13 @@
         <link rel = "stylesheet" type="text/css" href="style.css">
     </head>
     <body>
+        <div>
+            <input id="TEST" type="text" placeholder="TEST">
+            <button class="colorButton" onclick="console.log(
+                calculateTollCost(currentTime(), false, 35, 14)
+                )">Submit</button>
+        </div>
+
         <div style = "padding: 2px 0px">
             <input id="api-key" type="text" placeholder="Enter Google Maps API Key"
                 style = "width:100%; max-width: 300px">
@@ -27,6 +34,12 @@
             <p> Use Toll: </p>
             <input type="checkbox" id="tollCheckbox" name="tollCheckbox">
             <label for="tollCheckbox"></label>
+        </div>
+
+        <div class="checkbox">
+            <p> Weekend or Holiday?: </p>
+            <input type="checkbox" id="weekendCheckbox" name="weekendCheckbox">
+            <label for="weekendCheckbox"></label>
         </div>
 
         <script>
