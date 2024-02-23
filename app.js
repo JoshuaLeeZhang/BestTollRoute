@@ -19,6 +19,22 @@ function initMap() {
     });
 }
 
+async function testFunction() {
+  originCoords = {
+    lat: 43.833865382473235, 
+    lng: -79.35461289006618
+  }
+
+  destinationCoords = {
+    lat: 43.84461895842245, 
+    lng: -79.2448531687698
+  }
+
+  let answer = await mostCostEffectiveToll(originCoords, 31, 35, destinationCoords, false);
+
+  return answer;
+}
+
 let originCoords;
 let destinationCoords;
 let toll = true;
