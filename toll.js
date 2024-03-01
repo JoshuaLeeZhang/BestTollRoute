@@ -63,28 +63,14 @@ async function calculateTollInfo (tollStart, tollEnd) {
     tollInfo.innerHTML += '<p>' + "DISTANCE: " + route.distance.value + '</p>';
 }
 
-async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinationCoords, weekend) {
-    let originToInterchangeTimeMap = new Map();
-    let interchangeToDestinationTimeMap = new Map();
-
-    let response = await fetch("407Zones.JSON");
+async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinationCoords, weekend, transponder) {
+    const response = await fetch("407Zones.JSON");
     const data = await response.json();
 
-    for (let i = tollStart; i <= tollEnd; i++) { //This block calculates the time to and from all entrys and exits between the fastest entrys and exits 
-        let currentInterchangeCoords = {
-            lat: data.Coords[i].Lat,
-            lng: data.Coords[i].Lng
-        }
+    const interchangeTimes = await calculateInterchangeTimes(originCoords, tollStart, tollEnd, destinationCoords);
 
-        const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
-        const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
-
-        let originToInterchangeTime = originToInterchange.routes[0].legs[0].duration.value/60;
-        let interchangeToDestinationTime = interchangeToDestination.routes[0].legs[0].duration.value/60;
-
-        originToInterchangeTimeMap.set(i, originToInterchangeTime);
-        interchangeToDestinationTimeMap.set(i, interchangeToDestinationTime);
-    }
+    const toInterchangeTimes = interchangeTimes.originToInterchangeTimeMap;
+    const fromInterchangeTimes = interchangeTimes.interchangeToDestinationTimeMap;
 
     const originToDestinationNoToll = await createRoute(originCoords, destinationCoords, true);
     const originToDestinationNoTollTime = originToDestinationNoToll.routes[0].legs[0].duration.value/60; //This calculates the time if no toll is taken, this will be used for comparison
@@ -97,6 +83,16 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
         exit: 0
     }
 
+    let entryFee;
+
+    if (transponder) {
+        entryFee = 1;
+    } else {
+        entryFee = 4.2;
+    }
+
+    console.log(entryFee);
+
     if (goingEast) {
         for (let i = tollStart; i < tollEnd; i++) {
 
@@ -106,7 +102,8 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
             }
 
             for (let j = i+1; j <= tollEnd; j++) {
-                let totalTime = originToInterchangeTimeMap.get(i) + interchangeToDestinationTimeMap.get(j);
+                
+                let totalTime = toInterchangeTimes.get(i) + fromInterchangeTimes.get(j);
 
                 let endCoords = {
                     lat: data.Coords[j].Lat,
@@ -114,24 +111,23 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
                 }
 
 
-                const tollRoute = await createRoute(startCoords, endCoords, false);
-                totalTime += tollRoute.routes[0].legs[0].duration.value;
-
-                const entryTimeOn407 = (originToInterchangeTimeMap.get(i) + currentTime());
-
-                const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j);
-
-                const timeSaved = originToDestinationNoTollTime - totalTime;
-                
-                let timeSavedPerDollar = 0;
-
-                if (tollCost != 0) timeSavedPerDollar = timeSaved/tollCost; 
-
-                if (timeSavedPerDollar > maxTimeSavedPerDollar) {
-                    maxTimeSavedPerDollar = timeSavedPerDollar;
-                    maxTimeSavedPerDollarRoute = {
-                        entry: i,
-                        exit: j
+                if (totalTime < originToDestinationNoTollTime) {
+                    const tollRoute = await createRoute(startCoords, endCoords, false);
+                    totalTime += tollRoute.routes[0].legs[0].duration.value/60;
+    
+                    const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
+    
+                    const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j) + entryFee;
+    
+                    const timeSaved = originToDestinationNoTollTime - totalTime;
+                    const timeSavedPerDollar = timeSaved/tollCost;
+    
+                    if (timeSavedPerDollar > maxTimeSavedPerDollar) {
+                        maxTimeSavedPerDollar = timeSavedPerDollar;
+                        maxTimeSavedPerDollarRoute = {
+                            entry: i,
+                            exit: j
+                        }
                     }
                 }
 
@@ -146,31 +142,33 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
             }
 
             for (let j = i-1; j >= tollEnd; j--) {
-                let totalTime = originToInterchangeTimeMap.get(i) + interchangeToDestinationTimeMap.get(j);
+                let totalTime = toInterchangeTimes.get(i) + fromInterchangeTimes.get(j);
 
                 let endCoords = {
                     lat: data.Coords[j].Lat,
                     lng: data.Coords[j].Lng,
                 }
 
-
-                const tollRoute = await createRoute(startCoords, endCoords, false);
-                totalTime += tollRoute.routes[0].legs[0].duration.value;
-
-                const entryTimeOn407 = (originToInterchangeTimeMap.get(i) + currentTime());
-
-                const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j);
-
-                const timeSaved = originToDestinationNoTollTime - totalTime;
-                const timeSavedPerDollar = timeSaved/tollCost;
-
-                if (timeSavedPerDollar > maxTimeSavedPerDollar) {
-                    maxTimeSavedPerDollar = timeSavedPerDollar;
-                    maxTimeSavedPerDollarRoute = {
-                        entry: i,
-                        exit: j
+                if (totalTime < originToDestinationNoTollTime) {
+                    const tollRoute = await createRoute(startCoords, endCoords, false);
+                    totalTime += tollRoute.routes[0].legs[0].duration.value/60;
+    
+                    const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
+    
+                    const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j) + entryFee;
+    
+                    const timeSaved = originToDestinationNoTollTime - totalTime;
+                    const timeSavedPerDollar = timeSaved/tollCost;
+    
+                    if (timeSavedPerDollar > maxTimeSavedPerDollar) {
+                        maxTimeSavedPerDollar = timeSavedPerDollar;
+                        maxTimeSavedPerDollarRoute = {
+                            entry: i,
+                            exit: j
+                        }
                     }
                 }
+
             }
         }
     }
@@ -317,4 +315,112 @@ function findCommonNumbers(arr1, arr2) {
 function currentTime() {
     let now = new Date();
     return now.getMinutes() + now.getHours()*60;
+}
+
+async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, destinationCoords) {
+    let originToInterchangeTimeMap = new Map();
+    let interchangeToDestinationTimeMap = new Map();
+
+    const interchangeResponse = await fetch("407Interchanges.JSON");
+    const interchangeData = await interchangeResponse.json();
+
+    const goingEast = tollStart < tollEnd;
+
+    if (goingEast) {
+        for (let i = tollStart; i <= tollEnd; i++) { //This block calculates the time to and from all entrys and exits between the fastest entrys and exits 
+        let currentInterchangeCoords;
+        let minOriginToInterchangeTime;
+        let minInterchangeToDestinationTime;
+
+        if (interchangeData[i].COMMENT != "403" && interchangeData[i].COMMENT != "401" && interchangeData[i].COMMENT != "410" &&
+            interchangeData[i].COMMENT != "427" && interchangeData[i].COMMENT != "400" && interchangeData[i].COMMENT != "404") {
+            
+            currentInterchangeCoords = {
+                lat: interchangeData[i].Lat,
+                lng: interchangeData[i].Lng
+            }
+
+            const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
+            const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
+    
+            minOriginToInterchangeTime = originToInterchange.routes[0].legs[0].duration.value/60;
+            minInterchangeToDestinationTime = interchangeToDestination.routes[0].legs[0].duration.value/60;
+
+        } else {
+            let length = interchangeData[i].Coords.length;
+            
+            let originToInterchangeTimeArray = [];
+            let interchangeToDestinationTimeArray = [];
+
+            for (let j=0; j<length; j++) {
+
+                currentInterchangeCoords = {
+                    lat: interchangeData[i].Coords[j].Lat,
+                    lng: interchangeData[i].Coords[j].Lng
+                }
+
+                const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
+                const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
+
+                originToInterchangeTimeArray.push(originToInterchange.routes[0].legs[0].duration.value/60);
+                interchangeToDestinationTimeArray.push(interchangeToDestination.routes[0].legs[0].duration.value/60);
+            }
+
+            minOriginToInterchangeTime = Math.min(...originToInterchangeTimeArray);
+            minInterchangeToDestinationTime = Math.min(...interchangeToDestinationTimeArray);
+        }
+
+        originToInterchangeTimeMap.set(i, minOriginToInterchangeTime);
+        interchangeToDestinationTimeMap.set(i, minInterchangeToDestinationTime);
+        }
+    } else {
+        for (let i = tollStart; i >= tollEnd; i--) { //This block calculates the time to and from all entrys and exits between the fastest entrys and exits 
+            let currentInterchangeCoords;
+            let minOriginToInterchangeTime;
+            let minInterchangeToDestinationTime;
+    
+            if (interchangeData[i].COMMENT != "403" && interchangeData[i].COMMENT != "401" && interchangeData[i].COMMENT != "410" &&
+                interchangeData[i].COMMENT != "427" && interchangeData[i].COMMENT != "400" && interchangeData[i].COMMENT != "404") {
+                currentInterchangeCoords = {
+                    lat: interchangeData[i].Lat,
+                    lng: interchangeData[i].Lng
+                }
+    
+                const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
+                const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
+        
+                minOriginToInterchangeTime = originToInterchange.routes[0].legs[0].duration.value/60;
+                minInterchangeToDestinationTime = interchangeToDestination.routes[0].legs[0].duration.value/60;
+    
+            } else {
+                let length = interchangeData[i].Coords.length;
+                
+                let originToInterchangeTimeArray = [];
+                let interchangeToDestinationTimeArray = [];
+    
+                for (let j=0; j<length; j++) {
+    
+                    currentInterchangeCoords = {
+                        lat: interchangeData[i].Coords[j].Lat,
+                        lng: interchangeData[i].Coords[j].Lng
+                    }
+    
+                    const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
+                    const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
+    
+                    originToInterchangeTimeArray.push(originToInterchange.routes[0].legs[0].duration.value/60);
+                    interchangeToDestinationTimeArray.push(interchangeToDestination.routes[0].legs[0].duration.value/60);
+                }
+    
+                minOriginToInterchangeTime = Math.min(...originToInterchangeTimeArray);
+                minInterchangeToDestinationTime = Math.min(...interchangeToDestinationTimeArray);
+            }
+    
+            originToInterchangeTimeMap.set(i, minOriginToInterchangeTime);
+            interchangeToDestinationTimeMap.set(i, minInterchangeToDestinationTime);
+            }
+    }
+    
+
+    return {originToInterchangeTimeMap, interchangeToDestinationTimeMap};
 }
