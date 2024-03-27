@@ -20,19 +20,34 @@ function initMap() {
 }
 
 async function testFunction() {
-  destinationCoords = {
-    lat: 43.78003004333791, 
-    lng: -79.4158018519877
-  }
+  let destinationA = { lat: 43.78003004333791, lng: -79.4158018519877 };
+  let origin1 = { lat: 43.84461895842245, lng: -79.2448531687698 };
+  let origin2 = { lat: 43.78003004333791, lng: -79.4158018519877 };
+  let destinationB = { lat: 43.84461895842245, lng: -79.2448531687698 };
 
-  originCoords = {
-    lat: 43.84461895842245, 
-    lng: -79.2448531687698
-  }
+  let service = new google.maps.DistanceMatrixService();
 
-  let answer = await mostCostEffectiveToll(originCoords, 35, 27, destinationCoords, isWeekend, hasTransponder);
-
-  console.log(answer);
+  new Promise((resolve, reject) => {
+      service.getDistanceMatrix(
+          {
+              origins: [origin1, origin2],
+              destinations: [destinationA, destinationB],
+              travelMode: 'DRIVING',
+              // ... other options ...
+          },
+          (response, status) => {
+              if (status === 'OK') {
+                  resolve(response);
+              } else {
+                  reject('Distance Matrix request failed due to ' + status);
+              }
+          }
+      );
+  }).then(response => {
+      console.log(response);
+  }).catch(error => {
+      console.error(error);
+  });
 }
 
 let originCoords;

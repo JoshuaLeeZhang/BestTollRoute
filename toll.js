@@ -11,13 +11,13 @@ function areCoordsClose(routeCoords, actualCoords, tolerance) {
     distance = 2*earthRadius*Math.asin(Math.sqrt(distance));
   
     return distance <= tolerance;
-}
+} //return true if two coords are within tolerance distance, false if not
   
 function degToRad(degree) {
     return degree * (Math.PI / 180);
-}
+} //converts deg to rad, used in areCoordsClose
   
-async function findMatchingCoords(routeCoords) { //Finds first coord in JSON file that are close to routeCoords
+async function findMatchingCoords(routeCoords) { 
     const response = await fetch("407Zones.JSON");
     const data = await response.json();
   
@@ -33,13 +33,13 @@ async function findMatchingCoords(routeCoords) { //Finds first coord in JSON fil
         return {data: dataFromJSON, index: i};
       } 
     }
-}
+} //Finds the first coords in 407Zones.JSON that is considered to be "close" to the input coords, this is used to find the first and last interchange to be used
   
 function isToll(string) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(string, 'text/html');
     return doc.body.textContent.includes('Toll road');
-}
+} //Returns true if a string contains "Toll road". This is used to find the first and last interchange
 
 function isGoingEast(string) {
     const parser = new DOMParser();
@@ -49,7 +49,7 @@ function isGoingEast(string) {
     } else {
         return true;
     }
-}
+} //Checks if the 407 direction is east (true) or west (false)
   
 async function calculateTollInfo (tollStart, tollEnd) {
     let tollRoute = await createRoute(tollStart, tollEnd, true);
@@ -61,11 +61,11 @@ async function calculateTollInfo (tollStart, tollEnd) {
 
     tollInfo.innerHTML += '<p>' + "TIME: " + route.duration.text + '</p>';
     tollInfo.innerHTML += '<p>' + "DISTANCE: " + route.distance.value + '</p>';
-}
+} //Unused function that gives basic info about a toll route (duration and distance)
 
 async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinationCoords, weekend, transponder) {
     const response = await fetch("407Zones.JSON");
-    const data = await response.json();
+    const zones = await response.json();
 
     const interchangeTimes = await calculateInterchangeTimes(originCoords, tollStart, tollEnd, destinationCoords);
 
@@ -83,13 +83,8 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
         exit: 0
     }
 
-    let entryFee;
-
-    if (transponder) {
-        entryFee = 1;
-    } else {
-        entryFee = 4.2;
-    }
+    let entryFee = 4.2;
+    if (transponder) entryFee = 1;
 
     console.log(entryFee);
 
@@ -97,8 +92,8 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
         for (let i = tollStart; i < tollEnd; i++) {
 
             let startCoords = {
-                lat: data.Coords[i].Lat,
-                lng: data.Coords[i].Lng,
+                lat: zones.Coords[i].Lat,
+                lng: zones.Coords[i].Lng,
             }
 
             for (let j = i+1; j <= tollEnd; j++) {
@@ -106,24 +101,23 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
                 let totalTime = toInterchangeTimes.get(i) + fromInterchangeTimes.get(j);
 
                 let endCoords = {
-                    lat: data.Coords[j].Lat,
-                    lng: data.Coords[j].Lng,
+                    lat: zones.Coords[j].Lat,
+                    lng: zones.Coords[j].Lng,
                 }
 
 
                 if (totalTime < originToDestinationNoTollTime) {
                     const tollRoute = await createRoute(startCoords, endCoords, false);
                     totalTime += tollRoute.routes[0].legs[0].duration.value/60;
-    
-                    const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
-    
-                    const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j) + entryFee;
-    
                     const timeSaved = originToDestinationNoTollTime - totalTime;
-                    const timeSavedPerDollar = timeSaved/tollCost;
+
+                    const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
+                    
+                    let tollCost = entryFee;
+                    if (timeSaved/tollCost < maxTimeSavedPerDollar) tollCost += await calculateTollCost(entryTimeOn407, weekend, i, j);
     
-                    if (timeSavedPerDollar > maxTimeSavedPerDollar) {
-                        maxTimeSavedPerDollar = timeSavedPerDollar;
+                    if (timeSaved/tollCost > maxTimeSavedPerDollar) {
+                        maxTimeSavedPerDollar = timeSaved/tollCost;
                         maxTimeSavedPerDollarRoute = {
                             entry: i,
                             exit: j
@@ -137,31 +131,30 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
         for (let i = tollStart; i > tollEnd; i--) {
 
             let startCoords = {
-                lat: data.Coords[i].Lat,
-                lng: data.Coords[i].Lng,
+                lat: zones.Coords[i].Lat,
+                lng: zones.Coords[i].Lng,
             }
 
             for (let j = i-1; j >= tollEnd; j--) {
                 let totalTime = toInterchangeTimes.get(i) + fromInterchangeTimes.get(j);
 
                 let endCoords = {
-                    lat: data.Coords[j].Lat,
-                    lng: data.Coords[j].Lng,
+                    lat: zones.Coords[j].Lat,
+                    lng: zones.Coords[j].Lng,
                 }
 
                 if (totalTime < originToDestinationNoTollTime) {
                     const tollRoute = await createRoute(startCoords, endCoords, false);
                     totalTime += tollRoute.routes[0].legs[0].duration.value/60;
-    
-                    const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
-    
-                    const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j) + entryFee;
-    
                     const timeSaved = originToDestinationNoTollTime - totalTime;
-                    const timeSavedPerDollar = timeSaved/tollCost;
+
+                    const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
+                    
+                    let tollCost = entryFee;
+                    if (timeSaved/tollCost < maxTimeSavedPerDollar) tollCost += await calculateTollCost(entryTimeOn407, weekend, i, j);
     
-                    if (timeSavedPerDollar > maxTimeSavedPerDollar) {
-                        maxTimeSavedPerDollar = timeSavedPerDollar;
+                    if (timeSaved/tollCost > maxTimeSavedPerDollar) {
+                        maxTimeSavedPerDollar = timeSaved/tollCost;
                         maxTimeSavedPerDollarRoute = {
                             entry: i,
                             exit: j
@@ -178,82 +171,80 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
 
 async function calculateTollCost(minute, weekend, tollStart, tollEnd) {
     const response = await fetch("407Zones.JSON");
-    const data = await response.json();
+    const data407 = await response.json();
 
     let zoneDistance = [0, 0, 0, 0]; //distance traveled in each zone from Zone 1 to Zone 4
-    let currentZone = data.Coords[tollStart].ZONE;
-    let origin = {
-        lat: data.Coords[tollStart].Lat,
-        lng: data.Coords[tollStart].Lng,
-    }
-
-    const goingEast = tollStart < tollEnd;
+    let currentZone = data407.Coords[tollStart].ZONE; //this is the starting zone in the 407
+    let origin = { lat: data407.Coords[tollStart].Lat, lng: data407.Coords[tollStart].Lng} //this is the starting coords in the 407
+   
+    const goingEast = tollStart < tollEnd; //checks if going east
+    const rate407 = await determine407Rate(minute, goingEast, weekend); //returns rate for 407 in each zone
 
     if (goingEast) {
         for (let i = tollStart; i <= tollEnd; i++) {
-            if (!haveCommonNumber(data.Coords[i].ZONE, currentZone)) {
+            if (!haveCommonNumber(data407.Coords[i].ZONE, currentZone)) {
 
                 let destination = {
-                    lat: data.Coords[i-1].Lat,
-                    lng: data.Coords[i-1].Lng
+                    lat: data407.Coords[i-1].Lat,
+                    lng: data407.Coords[i-1].Lng
                 };
 
                 let calculatedRoute = await createRoute(origin, destination, false);
 
                 let distance = calculatedRoute.routes[0].legs[0].distance.value;
 
-                currentZone = findCommonNumbers(currentZone, data.Coords[i-1].ZONE);
+                currentZone = findCommonNumbers(currentZone, data407.Coords[i-1].ZONE);
 
                 zoneDistance[currentZone-1] = distance;
 
                 origin = destination;
-                currentZone = data.Coords[i].ZONE;
+                currentZone = data407.Coords[i].ZONE;
             } else if (i == tollEnd) {
-                let destination = {lat: data.Coords[i].Lat, lng: data.Coords[i].Lng};
+                let destination = {lat: data407.Coords[i].Lat, lng: data407.Coords[i].Lng};
 
                 let calculatedRoute = await createRoute(origin, destination, false);
 
                 let distance = calculatedRoute.routes[0].legs[0].distance.value;
 
-                currentZone = findCommonNumbers(currentZone, data.Coords[i-1].ZONE);
+                currentZone = findCommonNumbers(currentZone, data407.Coords[i-1].ZONE);
 
                 zoneDistance[currentZone-1] = distance;
             }
         }
     } else {
         for (let i = tollStart; i >= tollEnd; i--) {
-            if (!haveCommonNumber(data.Coords[i].ZONE, currentZone)) {
+            if (!haveCommonNumber(data407.Coords[i].ZONE, currentZone)) {
 
                 let destination = {
-                    lat: data.Coords[i-1].Lat,
-                    lng: data.Coords[i-1].Lng
+                    lat: data407.Coords[i-1].Lat,
+                    lng: data407.Coords[i-1].Lng
                 };
 
                 let calculatedRoute = await createRoute(origin, destination, false);
 
                 let distance = calculatedRoute.routes[0].legs[0].distance.value;
 
-                currentZone = findCommonNumbers(currentZone, data.Coords[i+1].ZONE);
+                currentZone = findCommonNumbers(currentZone, data407.Coords[i+1].ZONE);
 
                 zoneDistance[currentZone-1] = distance;
 
                 origin = destination;
-                currentZone = data.Coords[i].ZONE;
+                currentZone = data407.Coords[i].ZONE;
             } else if (i == tollEnd) {
-                let destination = {lat: data.Coords[i].Lat, lng: data.Coords[i].Lng};
+                let destination = {lat: data407.Coords[i].Lat, lng: data407.Coords[i].Lng};
 
                 let calculatedRoute = await createRoute(origin, destination, false);
 
                 let distance = calculatedRoute.routes[0].legs[0].distance.value;
 
-                currentZone = findCommonNumbers(currentZone, data.Coords[i+1].ZONE);
+                currentZone = findCommonNumbers(currentZone, data407.Coords[i+1].ZONE);
 
                 zoneDistance[currentZone-1] = distance;
             }
         }       
     }
 
-    const rate407 = await determine407Rate(minute, goingEast, weekend)
+    
 
     let totalCost = 0;
     let totalDistance = 0;
@@ -294,11 +285,11 @@ async function determine407Rate(minute, east, weekend) {
     }
 
     return 0;
-}
+} //returns the cost per km on the 407
 
 function haveCommonNumber(arr1, arr2) {
     return arr1.some(item => arr2.includes(item));
-}
+} //returns true if two arrays have a common number, false if not.
 
 function findCommonNumbers(arr1, arr2) {
     let common = [];
@@ -315,7 +306,7 @@ function findCommonNumbers(arr1, arr2) {
 function currentTime() {
     let now = new Date();
     return now.getMinutes() + now.getHours()*60;
-}
+} //gets current time in seconds
 
 async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, destinationCoords) {
     let originToInterchangeTimeMap = new Map();
