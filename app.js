@@ -65,7 +65,8 @@ async function updateRoute() {
   if (typeof routeData.tollStartIndex == 'undefined') {
     console.log("No toll needed");
   } else {
-    const mostCostEffectiveTollRoute = mostCostEffectiveToll(originCoords, routeData.tollStartIndex, routeData.tollEndIndex, destinationCoords, isWeekend, hasTransponder);
+    const mostCostEffectiveTollRoute = await mostCostEffectiveToll(originCoords, routeData.tollStartIndex, routeData.tollEndIndex, destinationCoords, isWeekend, hasTransponder);
+    console.log(mostCostEffectiveTollRoute);
   }
 }
 
