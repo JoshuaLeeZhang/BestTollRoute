@@ -8,3 +8,36 @@
     margin-right: 10px;
     font-family: Arial, sans-serif;
 }
+
+#buttonMap {
+    width: 400px;
+    border: none;
+    appearance: none;
+    background-color: grey;
+    padding: 12px;
+    margin-left: 30px;
+}
+
+.textField {
+    input[type="text"] {
+        border: none;
+        appearance: none;
+        background: #f2f2f2;
+        padding: 12px;
+        outline: none;
+        width: 376px;
+    }
+
+    width: 400px;
+    margin-left: 30px;
+    margin-top: 30px;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1; /* Put the map behind other content */
+}

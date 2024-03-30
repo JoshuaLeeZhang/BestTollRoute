@@ -15,7 +15,10 @@ function initGoogleMaps() {
 function initMap() {
     const map = new google.maps.Map(document.getElementById("map"), {
       zoom: 8,
-      center: {lat: 43.69, lng: -79.37}
+      center: {lat: 43.69, lng: -79.37},
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false
     });
 }
 
