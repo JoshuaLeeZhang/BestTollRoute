@@ -7,48 +7,27 @@
     </head>
     <body>
 
-        <div class = "textField">
+        <div class = "createRoute">
             <input id="api-key" type="text" placeholder="Enter Google Maps API Key">
             <input id = "origin" type = "text" placeholder = "Enter a origin">
             <input id = "destination" type = "text" placeholder = "Enter a destination">
-        </div>
-        
-        <div>
-            <button id = "buttonMap" onclick="loadMapScript()">Load Map</button>
+            <button type = "button" onclick="loadMapScript()">Load Map</button>
+            <button type = "button" onclick="updateRoute()">Create Route</button>
         </div>
 
-        <div>
-            <button id = "buttonMap" onclick="updateRoute()">Create Route</button>
+        <div class = "checkBoxBackground">
+            <div class = "checkbox-item">
+                <input type="checkbox" id="weekendCheckbox">
+                <label for="weekendCheckbox">Is Weekend</label>
+            </div>
+            
+            <div class = "checkbox-item">
+                <input type="checkbox" id="transCheckbox">
+                <label for="transCheckbox">Has Transponder</label>
+            </div>
         </div>
-
-        <!-- <div class="checkbox">
-            <p> Avoid Toll: </p>
-            <input type="checkbox" id="tollCheckbox" name="tollCheckbox">
-            <label for="tollCheckbox"></label>
-        </div>
-
-        <div class="checkbox">
-            <p> Weekend or Holiday?: </p>
-            <input type="checkbox" id="weekendCheckbox" name="weekendCheckbox">
-            <label for="weekendCheckbox"></label>
-        </div>
-
-        <div class="checkbox">
-            <p> Transponder?: </p>
-            <input type="checkbox" id="transCheckbox" name="transCheckbox">
-            <label for="transCheckbox"></label>
-        </div>
-         -->
          
         <div id="map"></div>
-
-
-        <!-- <h3>Total Travel Time</h3>
-        <div id = "travelTime"></div>
-        <h3>Toll Info</h3>
-        <div id = "tollInfo"></div>
-        <h3>Direction Instructions</h3>
-        <div id = "DirectionInstructions"></div> -->
         
         <script src = "app.js"></script>
         <script src = "autocomplete.js"></script>

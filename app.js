@@ -22,37 +22,6 @@ function initMap() {
     });
 }
 
-async function testFunction() {
-  let destinationA = { lat: 43.78003004333791, lng: -79.4158018519877 };
-  let origin1 = { lat: 43.84461895842245, lng: -79.2448531687698 };
-  let origin2 = { lat: 43.78003004333791, lng: -79.4158018519877 };
-  let destinationB = { lat: 43.84461895842245, lng: -79.2448531687698 };
-
-  let service = new google.maps.DistanceMatrixService();
-
-  new Promise((resolve, reject) => {
-      service.getDistanceMatrix(
-          {
-              origins: [origin1, origin2],
-              destinations: [destinationA, destinationB],
-              travelMode: 'DRIVING',
-              // ... other options ...
-          },
-          (response, status) => {
-              if (status === 'OK') {
-                  resolve(response);
-              } else {
-                  reject('Distance Matrix request failed due to ' + status);
-              }
-          }
-      );
-  }).then(response => {
-      console.log(response);
-  }).catch(error => {
-      console.error(error);
-  });
-}
-
 let originCoords;
 let destinationCoords;
 let avoidToll = false;
@@ -62,8 +31,7 @@ let hasTransponder = false;
 async function updateRoute() {
   const calculatedRoute = await createRoute(originCoords, destinationCoords, avoidToll);
   displayRoute(calculatedRoute);
-  const routeData = await displayInstructions(calculatedRoute);
-  displayTravelTime(calculatedRoute);
+  const routeData = await routeInstructions(calculatedRoute);
 
   if (typeof routeData.tollStartIndex == 'undefined') {
     console.log("No toll needed");
@@ -73,29 +41,13 @@ async function updateRoute() {
   }
 }
 
-async function createRoute(origin, destination, toll) {
-  return new Promise((resolve, reject) => {
-    const directionsService = new google.maps.DirectionsService();
-
-    directionsService.route({
-      origin: origin,
-      destination: destination,
-      travelMode: google.maps.TravelMode.DRIVING,
-      avoidTolls: toll
-    }, 
-
-      (response, status) => {
-        if (status == "OK") resolve(response);
-        else reject("Request failed due to: " + status);
-      }
-    )
-  })
-}
-
 function displayRoute(calculatedRoute) {
   const map = new google.maps.Map(document.getElementById("map"), {
     zoom: 7,
     center: originCoords,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false
   });
 
   const directionsRenderer = new google.maps.DirectionsRenderer({
@@ -111,10 +63,7 @@ async function displayTravelTime(directionsResult) {
   travelTime.innerHTML = '<p>' + directionsResult.routes[0].legs[0].duration.text + '</p>';
 }
 
-async function displayInstructions(directionsResult) {
-  const DirectionInstructions = document.getElementById("DirectionInstructions");
-  DirectionInstructions.innerHTML = '';
-
+async function routeInstructions(directionsResult) {
   let counter = 0;
   let Start407Data;
   let End407Data;
@@ -125,14 +74,8 @@ async function displayInstructions(directionsResult) {
     let step = directionsResult.routes[0].legs[0].steps[j];
 
     let instruction = step.instructions;
-    let currLat = step.start_location.lat();
-    let currLng = step.start_location.lng();
-
-    DirectionInstructions.innerHTML += '<p>' + instruction + '</p>';
     
-    // console.log(instruction + "COORDS: " + currLat + "," + currLng);
-    
-    let currentCoords = {lat: currLat, lng: currLng};
+    let currentCoords = {lat: step.start_location.lat(), lng: step.start_location.lng()};
     
     if (counter == 0) {
       if (isToll(instruction)) {
@@ -141,7 +84,7 @@ async function displayInstructions(directionsResult) {
         tollStartIndex = Start407.index;
         counter++;
 
-        console.log(Start407.data.COMMENT); // FOR DEBUGGING
+        console.log("ORIGINAL TOLL ENTRY:" + Start407.data.COMMENT); // FOR DEBUGGING
       }
     }
     if (counter == 1) {
@@ -151,11 +94,9 @@ async function displayInstructions(directionsResult) {
         tollEndIndex = End407.index;
         counter++;
 
-        console.log(End407.data.COMMENT); // FOR DEBUGGING
+        console.log("ORIGINAL TOLL EXIT:" + End407.data.COMMENT); // FOR DEBUGGING
       }
     }
-
-    DirectionInstructions.innerHTML += '<p>' + "__________________________________________________" + '</p>';
   }
 
   return {
@@ -168,19 +109,16 @@ async function displayInstructions(directionsResult) {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-  let tollCheckbox = document.getElementById("tollCheckbox");
-  let weekendCheckbox = document.getElementById("weekendCheckbox")
-  let transCheckbox = document.getElementById("transCheckbox")
-
-  tollCheckbox.addEventListener("change", function() {
-    avoidToll = this.checked;
-  })
+  let weekendCheckbox = document.getElementById("weekendCheckbox");
+  let transCheckbox = document.getElementById("transCheckbox");
 
   weekendCheckbox.addEventListener("change", function() {
     isWeekend = this.checked;
+    console.log("WEEKEND SWITCHED TO: " + isWeekend)
   })
 
   transCheckbox.addEventListener("change", function() {
     hasTransponder = this.checked;
+    console.log("TRANSPONDER SWITCHED TO: " + hasTransponder)
   })
 })

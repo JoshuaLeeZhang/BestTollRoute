@@ -1,36 +1,34 @@
-.checkbox {
-    display: flex;
-    align-items: left;
-}
-
-.checkbox p {
-    margin: 0.2;
-    margin-right: 10px;
-    font-family: Arial, sans-serif;
-}
-
-#buttonMap {
-    width: 400px;
-    border: none;
-    appearance: none;
-    background-color: grey;
-    padding: 12px;
-    margin-left: 30px;
-}
-
-.textField {
-    input[type="text"] {
-        border: none;
-        appearance: none;
-        background: #f2f2f2;
+.createRoute {
+    input{
+        width: 400px;
         padding: 12px;
+        box-sizing: border-box;
+
+        border: 0px;
+        appearance: none;
+        background: whitesmoke;
         outline: none;
-        width: 376px;
+    }
+
+    button{
+        width: 400px;
+        padding: 12px;
+        box-sizing: border-box;
+
+        border: 0px;
+        appearance: none;
+        background-color: grey;
+        outline: none;
     }
 
     width: 400px;
-    margin-left: 30px;
-    margin-top: 30px;
+
+    background-color: whitesmoke;
+    border-radius: 15px;
+    padding: 20px;
+
+    margin-left: 45px;
+    margin-top: 45px;
 }
 
 #map {
@@ -40,4 +38,51 @@
     top: 0;
     left: 0;
     z-index: -1; /* Put the map behind other content */
+}
+
+.checkBoxBackground {
+    input{
+        appearance: none;
+        background-color: white;
+        border: 2px solid black;
+        border-radius: 5px;
+        width: 25px;
+        height: 25px;
+        cursor: pointer;
+        margin-right: 10px;
+
+
+        &:hover {
+            background-color:#FFD580;
+        }
+
+        &:checked {
+            background-color: orange;
+        }
+    }
+
+    label {
+        cursor: pointer;
+        font-family: Arial, sans-serif;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: center; 
+        margin: 10px;
+    }
+
+    display: flex;
+    justify-content: space-evenly;
+    flex-wrap: wrap;
+    
+
+    width: 400px; 
+
+    background-color: whitesmoke;
+    border-radius: 15px;
+    padding: 20px;
+
+    margin-left: 45px;
+    margin-top: 15px;
 }

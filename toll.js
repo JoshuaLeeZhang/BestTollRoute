@@ -77,16 +77,16 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
 
     const goingEast = tollStart < tollEnd; // Determine the direction of travel on the 407 toll route. The toll interchanges on the 407 are indexed such that their index value increases from west to east. Ex. index 0 is the most westward interchange 
 
-    let maxTimeSavedPerDollar = 0;
-    let maxTimeSavedPerDollarRoute = {
-        entry: 0,
-        exit: 0
-    }
-
     let entryFee = 4.2;
     if (transponder) entryFee = 1;
 
-    console.log(entryFee);
+    console.log("TRANSPONDER FEE:" + entryFee);
+
+    let maxTimeSavedPerDollar = 0;
+    let maxTimeSavedPerDollarRoute = {
+        entry: tollStart,
+        exit: tollEnd
+    }
 
     if (goingEast) {
         for (let i = tollStart; i < tollEnd; i++) {
@@ -167,7 +167,16 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
             }
         }
     }
-    
+
+    if (maxTimeSavedPerDollar == 0 || (tollStart == maxTimeSavedPerDollarRoute.entry && tollEnd == maxTimeSavedPerDollarRoute.exit)) {
+        console.log("The most economical toll route is the one provided by Google Maps");
+    } else {
+        console.log("Entry and exit for most economical toll route is provided below: ");
+        console.log("ENTRY:" + zones.Coords[maxTimeSavedPerDollarRoute.entry].COMMENT);
+        console.log("EXIT:" + zones.Coords[maxTimeSavedPerDollarRoute.exit].COMMENT);
+    }
+
+
     return {maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute};
 }
 
@@ -370,3 +379,23 @@ async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, desti
 
     return {originToInterchangeTimeMap, interchangeToDestinationTimeMap};
 }
+
+
+async function createRoute(origin, destination, toll) {
+    return new Promise((resolve, reject) => {
+      const direction = new google.maps.DirectionsService();
+  
+      direction.route({
+        origin: origin,
+        destination: destination,
+        travelMode: google.maps.TravelMode.DRIVING,
+        avoidTolls: toll
+      }, 
+  
+        (response, status) => {
+          if (status == "OK") resolve(response);
+          else reject("Request failed due to: " + status);
+        }
+      )
+    })
+  }
