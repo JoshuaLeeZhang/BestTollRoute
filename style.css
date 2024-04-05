@@ -1,34 +1,86 @@
-.createRoute {
-    input{
-        width: 400px;
-        padding: 12px;
-        box-sizing: border-box;
-
-        border: 0px;
-        appearance: none;
-        background: whitesmoke;
-        outline: none;
-    }
-
-    button{
-        width: 400px;
-        padding: 12px;
-        box-sizing: border-box;
-
-        border: 0px;
-        appearance: none;
-        background-color: grey;
-        outline: none;
-    }
-
-    width: 400px;
+.routePanels {
+    width: 400px; 
 
     background-color: whitesmoke;
     border-radius: 15px;
     padding: 20px;
 
-    margin-left: 45px;
-    margin-top: 45px;
+    left: 45px;
+
+    position: absolute;
+}
+
+
+#routeCreate {
+    top: 45px;
+}
+
+#routeCreate input{
+    width: 400px;
+    padding: 12px;
+    box-sizing: border-box;
+
+    border: 0px;
+    appearance: none;
+    background: whitesmoke;
+    outline: none;
+}
+
+#routeCreate button{
+    width: 400px;
+    padding: 12px;
+    box-sizing: border-box;
+
+    border: 0px;
+    appearance: none;
+    background-color: grey;
+    outline: none;
+}
+
+#routeOptions {
+    display: flex;
+    justify-content: space-evenly;
+    flex-wrap: wrap;
+
+    height: 45px;
+
+    top: 300px;
+}
+
+#routeOptions input{
+    appearance: none;
+    background-color: white;
+    border: 2px solid black;
+    border-radius: 5px;
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+    margin-right: 10px;
+
+    &:hover {
+        background-color:#FFD580;
+    }
+
+    &:checked {
+        background-color: orange;
+    }
+}
+
+#routeOptions label {
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+}
+
+#routeOptions .checkbox-item {
+    display: flex;
+    align-items: center; 
+    margin: 10px;
+}
+
+#routeResults {
+    height: 50px;
+
+    top: 410px;
 }
 
 #map {
@@ -38,51 +90,4 @@
     top: 0;
     left: 0;
     z-index: -1; /* Put the map behind other content */
-}
-
-.checkBoxBackground {
-    input{
-        appearance: none;
-        background-color: white;
-        border: 2px solid black;
-        border-radius: 5px;
-        width: 25px;
-        height: 25px;
-        cursor: pointer;
-        margin-right: 10px;
-
-
-        &:hover {
-            background-color:#FFD580;
-        }
-
-        &:checked {
-            background-color: orange;
-        }
-    }
-
-    label {
-        cursor: pointer;
-        font-family: Arial, sans-serif;
-    }
-
-    .checkbox-item {
-        display: flex;
-        align-items: center; 
-        margin: 10px;
-    }
-
-    display: flex;
-    justify-content: space-evenly;
-    flex-wrap: wrap;
-    
-
-    width: 400px; 
-
-    background-color: whitesmoke;
-    border-radius: 15px;
-    padding: 20px;
-
-    margin-left: 45px;
-    margin-top: 15px;
 }

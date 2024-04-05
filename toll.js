@@ -28,13 +28,35 @@ async function findMatchingCoords(routeCoords) {
   
       const jsonCoords = {lat: dataFromJSON.Lat, lng: dataFromJSON.Lng};
       const tolerance = dataFromJSON.Tol;
-  
+    
       if (areCoordsClose(routeCoords, jsonCoords, tolerance)) {
+       
         return {data: dataFromJSON, index: i};
       } 
     }
 } //Finds the first coords in 407Zones.JSON that is considered to be "close" to the input coords, this is used to find the first and last interchange to be used
-  
+
+function dealWithCloseCoords(streetName, instruction) {
+    
+    if (streetName == "Woodbine") {
+        //CHECK IF COORD IS WOODBINE, IF IT IS SCRAP TEXT FROM INSTRUCTION TO CONFIRM IF WOODBINE OR 404
+      } else if (streetName == "404") {
+        //CHECK IF WOODBINE OR LESLIE
+      } else if (streetName == "Leslie") {
+        //CHECK IF 404
+      } else if (streetName == "Jane") {
+        //CHECK IF 400
+      } else if (streetName == "400") {
+        //CHECK IF JANE OR WESTON
+      } else if (streetName == "Weston") {
+        //CHECK IF 400
+      } else if (streetName == "427") {
+        //CHECK IF 27
+      } else if (streetName == "27") {
+        //CHECK IF 427
+      } 
+}
+
 function isToll(string) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(string, 'text/html');
@@ -82,7 +104,11 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
 
     console.log("TRANSPONDER FEE:" + entryFee);
 
-    let maxTimeSavedPerDollar = 0;
+    let maxTimeSavedPerDollar = {
+        ratio: 0,
+        timeSaved: 0,
+        dollar: 0
+    };
     let maxTimeSavedPerDollarRoute = {
         entry: tollStart,
         exit: tollEnd
@@ -108,7 +134,7 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
 
                 if (totalTime < originToDestinationNoTollTime) {
                     const tollRoute = await createRoute(startCoords, endCoords, false);
-                    totalTime += tollRoute.routes[0].legs[0].duration.value/60;
+                    totalTime += tollRoute.routes[0].legs[0].duration.value;
                     const timeSaved = originToDestinationNoTollTime - totalTime;
 
                     const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
@@ -118,7 +144,9 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
                     const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j, maxAllowableTollCost, entryFee);
     
                     if (tollCost != -1) { //calculateTollCost will return -1 if the route cannot be more effective
-                        maxTimeSavedPerDollar = timeSaved/tollCost;
+                        maxTimeSavedPerDollar.ratio = timeSaved/tollCost;
+                        maxTimeSavedPerDollar.dollar = tollCost;
+                        maxTimeSavedPerDollar.timeSaved = timeSaved;
                         maxTimeSavedPerDollarRoute = {
                             entry: i,
                             exit: j
@@ -146,17 +174,21 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
 
                 if (totalTime < originToDestinationNoTollTime) {
                     const tollRoute = await createRoute(startCoords, endCoords, false);
-                    totalTime += tollRoute.routes[0].legs[0].duration.value/60;
+                    totalTime += tollRoute.routes[0].legs[0].duration.value;
+
+
                     const timeSaved = originToDestinationNoTollTime - totalTime;
 
                     const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
 
-                    const maxAllowableTollCost = timeSaved/maxTimeSavedPerDollar;
+                    const maxAllowableTollCost = timeSaved/maxTimeSavedPerDollar; 
 
                     const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j, maxAllowableTollCost, entryFee);
     
                     if (tollCost != -1) { //calculateTollCost will return -1 if the route cannot be more effective
-                        maxTimeSavedPerDollar = timeSaved/tollCost;
+                        maxTimeSavedPerDollar.ratio = timeSaved/tollCost; // seconds per cent
+                        maxTimeSavedPerDollar.dollar = tollCost;
+                        maxTimeSavedPerDollar.timeSaved = timeSaved;
                         maxTimeSavedPerDollarRoute = {
                             entry: i,
                             exit: j
@@ -168,16 +200,21 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
         }
     }
 
+    const bestTollEnter = zones.Coords[maxTimeSavedPerDollarRoute.entry].COMMENT;
+    const bestTollExit = zones.Coords[maxTimeSavedPerDollarRoute.exit].COMMENT;
+
     if (maxTimeSavedPerDollar == 0 || (tollStart == maxTimeSavedPerDollarRoute.entry && tollEnd == maxTimeSavedPerDollarRoute.exit)) {
         console.log("The most economical toll route is the one provided by Google Maps");
     } else {
         console.log("Entry and exit for most economical toll route is provided below: ");
-        console.log("ENTRY:" + zones.Coords[maxTimeSavedPerDollarRoute.entry].COMMENT);
-        console.log("EXIT:" + zones.Coords[maxTimeSavedPerDollarRoute.exit].COMMENT);
+        console.log("ENTRY:" + bestTollEnter);
+        console.log("EXIT:" + bestTollExit);
     }
 
+    
+    console.log(maxTimeSavedPerDollar)
 
-    return {maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute};
+    return {maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute, bestTollEnter, bestTollExit, tollStart, tollEnd};
 }
 
 async function calculateTollCost(minute, weekend, tollStart, tollEnd, maxPrice, transponder) {
@@ -215,7 +252,7 @@ async function calculateTollCost(minute, weekend, tollStart, tollEnd, maxPrice, 
         
         if (price > maxPrice) return -1;
     }
-
+    
     return price;
 } //Calculates price to drive between two interchanges, includes flat rate.
   //Compares price to maxPrice to check if price has exceeded maxPrice.
@@ -249,7 +286,7 @@ async function determine407Rate(minute, east, weekend) {
     }
 
     return 0;
-} //returns the cost per km on the 407
+} //returns the price in cents per km at various points on the 407
 
 function haveCommonNumber(arr1, arr2) {
     return arr1.some(item => arr2.includes(item));
@@ -265,7 +302,7 @@ function findCommonNumbers(arr1, arr2) {
     }
 
     return common;
-}
+} //returns array of common numbers
 
 function currentTime() {
     let now = new Date();
@@ -298,8 +335,8 @@ async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, desti
             const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
             const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
     
-            minOriginToInterchangeTime = originToInterchange.routes[0].legs[0].duration.value/60;
-            minInterchangeToDestinationTime = interchangeToDestination.routes[0].legs[0].duration.value/60;
+            minOriginToInterchangeTime = originToInterchange.routes[0].legs[0].duration.value;
+            minInterchangeToDestinationTime = interchangeToDestination.routes[0].legs[0].duration.value;
 
         } else {
             let length = interchangeData[i].Coords.length;
@@ -317,8 +354,8 @@ async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, desti
                 const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
                 const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
 
-                originToInterchangeTimeArray.push(originToInterchange.routes[0].legs[0].duration.value/60);
-                interchangeToDestinationTimeArray.push(interchangeToDestination.routes[0].legs[0].duration.value/60);
+                originToInterchangeTimeArray.push(originToInterchange.routes[0].legs[0].duration.value);
+                interchangeToDestinationTimeArray.push(interchangeToDestination.routes[0].legs[0].duration.value);
             }
 
             minOriginToInterchangeTime = Math.min(...originToInterchangeTimeArray);
@@ -344,8 +381,8 @@ async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, desti
                 const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
                 const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
         
-                minOriginToInterchangeTime = originToInterchange.routes[0].legs[0].duration.value/60;
-                minInterchangeToDestinationTime = interchangeToDestination.routes[0].legs[0].duration.value/60;
+                minOriginToInterchangeTime = originToInterchange.routes[0].legs[0].duration.value;
+                minInterchangeToDestinationTime = interchangeToDestination.routes[0].legs[0].duration.value;
     
             } else {
                 let length = interchangeData[i].Coords.length;
@@ -363,8 +400,8 @@ async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, desti
                     const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
                     const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
     
-                    originToInterchangeTimeArray.push(originToInterchange.routes[0].legs[0].duration.value/60);
-                    interchangeToDestinationTimeArray.push(interchangeToDestination.routes[0].legs[0].duration.value/60);
+                    originToInterchangeTimeArray.push(originToInterchange.routes[0].legs[0].duration.value);
+                    interchangeToDestinationTimeArray.push(interchangeToDestination.routes[0].legs[0].duration.value);
                 }
     
                 minOriginToInterchangeTime = Math.min(...originToInterchangeTimeArray);
@@ -378,7 +415,7 @@ async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, desti
     
 
     return {originToInterchangeTimeMap, interchangeToDestinationTimeMap};
-}
+} //returns originToInterchangeTimes and interchangeToDestinationTimes in seconds
 
 
 async function createRoute(origin, destination, toll) {

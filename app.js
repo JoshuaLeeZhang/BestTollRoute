@@ -35,9 +35,15 @@ async function updateRoute() {
 
   if (typeof routeData.tollStartIndex == 'undefined') {
     console.log("No toll needed");
+    document.getElementById("bestRoute").innerHTML = "No Toll Needed!";
   } else {
-    const mostCostEffectiveTollRoute = await mostCostEffectiveToll(originCoords, routeData.tollStartIndex, routeData.tollEndIndex, destinationCoords, isWeekend, hasTransponder);
-    console.log(mostCostEffectiveTollRoute);
+    // const { maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute, bestTollEnter, bestTollExit, tollStart, tollEnd} = await mostCostEffectiveToll(originCoords, routeData.tollStartIndex, routeData.tollEndIndex, destinationCoords, isWeekend, hasTransponder);
+    // if (bestTollEnter == tollStart && bestTollExit == tollEnd) {
+    //   document.getElementById("bestRoute").innerHTML = "The best route is to enter and exit according to Google Maps' original instructions. Enter at " + bestTollEnter + " and exit at " + bestTollExit;
+    // } else {
+      
+    // document.getElementById("bestRoute").innerHTML = "Enter at " + bestTollEnter + " and exit at " + bestTollExit + " to save " + maxTimeSavedPerDollar.ratio + " seconds per dollar.";
+    // }
   }
 }
 
@@ -64,11 +70,12 @@ async function displayTravelTime(directionsResult) {
 }
 
 async function routeInstructions(directionsResult) {
-  let counter = 0;
   let Start407Data;
   let End407Data;
   let tollStartIndex;
   let tollEndIndex;
+
+  let wasPreviousToll = false;
 
   for (let j = 0; j < directionsResult.routes[0].legs[0].steps.length; j++) {
     let step = directionsResult.routes[0].legs[0].steps[j];
@@ -76,27 +83,30 @@ async function routeInstructions(directionsResult) {
     let instruction = step.instructions;
     
     let currentCoords = {lat: step.start_location.lat(), lng: step.start_location.lng()};
+
+    console.log(instruction)
+
+    const isCurrentToll = isToll(instruction);
     
-    if (counter == 0) {
-      if (isToll(instruction)) {
-        const Start407 = await findMatchingCoords(currentCoords);
-        Start407Data = Start407.data;
-        tollStartIndex = Start407.index;
-        counter++;
+    if (isCurrentToll && !wasPreviousToll) {
+      const Start407 = await findMatchingCoords(currentCoords);
 
-        console.log("ORIGINAL TOLL ENTRY:" + Start407.data.COMMENT); // FOR DEBUGGING
-      }
-    }
-    if (counter == 1) {
-      if (!isToll(instruction)) {
-        const End407 = await findMatchingCoords(currentCoords);
-        End407Data = End407.data;
-        tollEndIndex = End407.index;
-        counter++;
+      Start407Data = Start407.data;
+      tollStartIndex = Start407.index;
 
-        console.log("ORIGINAL TOLL EXIT:" + End407.data.COMMENT); // FOR DEBUGGING
-      }
+      console.log("ORIGINAL TOLL ENTRY:" + Start407.data.COMMENT); // FOR DEBUGGING
     }
+    
+    if (!isCurrentToll && wasPreviousToll) {   
+      const End407 = await findMatchingCoords(currentCoords);
+      End407Data = End407.data;
+      tollEndIndex = End407.index;
+
+      console.log("ORIGINAL TOLL EXIT:" + End407.data.COMMENT); // FOR DEBUGGING
+    }
+
+    if (isCurrentToll) wasPreviousToll = true;
+    else wasPreviousToll = false;
   }
 
   return {

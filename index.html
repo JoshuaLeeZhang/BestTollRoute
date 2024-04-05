@@ -6,8 +6,7 @@
         <link rel = "stylesheet" type="text/css" href="style.css">
     </head>
     <body>
-
-        <div class = "createRoute">
+        <div id = "routeCreate" class = "routePanels">
             <input id="api-key" type="text" placeholder="Enter Google Maps API Key">
             <input id = "origin" type = "text" placeholder = "Enter a origin">
             <input id = "destination" type = "text" placeholder = "Enter a destination">
@@ -15,7 +14,7 @@
             <button type = "button" onclick="updateRoute()">Create Route</button>
         </div>
 
-        <div class = "checkBoxBackground">
+        <div id = "routeOptions" class = "routePanels">
             <div class = "checkbox-item">
                 <input type="checkbox" id="weekendCheckbox">
                 <label for="weekendCheckbox">Is Weekend</label>
@@ -24,6 +23,12 @@
             <div class = "checkbox-item">
                 <input type="checkbox" id="transCheckbox">
                 <label for="transCheckbox">Has Transponder</label>
+            </div>
+        </div>
+
+        <div id = "routeResults" class = "routePanels">
+            <div>
+                <p id = "bestRoute"></p>
             </div>
         </div>
          
