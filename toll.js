@@ -1,4 +1,6 @@
 function areCoordsClose(routeCoords, actualCoords, tolerance) {
+    if (tolerance == -1) return -1;
+
     const earthRadius = 6371;
   
     const diffLat = degToRad(actualCoords.lat - routeCoords.lat);
@@ -7,20 +9,25 @@ function areCoordsClose(routeCoords, actualCoords, tolerance) {
     const routeLat = degToRad(routeCoords.lat);
     const actualLat = degToRad(actualCoords.lat);
   
-    let distance = Math.sin(diffLng/2)*Math.sin(diffLng/2) + Math.cos(routeLat)*Math.cos(actualLat)*Math.sin(diffLat/2)*Math.sin(diffLat/2);
-    distance = 2*earthRadius*Math.asin(Math.sqrt(distance));
+    const a = Math.sin(diffLat/2)*Math.sin(diffLat/2) + Math.cos(routeLat)*Math.cos(actualLat)*Math.sin(diffLng/2)*Math.sin(diffLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = earthRadius * c;
+    //https://www.movable-type.co.uk/scripts/latlong.html for haversine formula above
   
-    return distance <= tolerance;
-} //return true if two coords are within tolerance distance, false if not
+    if (distance <= tolerance) {
+        return 1;
+    } else {
+        return 0;
+    }
+} //return 1 if two coords are within tolerance distance, 0 if not, and -1 for specific points
   
 function degToRad(degree) {
     return degree * (Math.PI / 180);
 } //converts deg to rad, used in areCoordsClose
   
-async function findMatchingCoords(routeCoords) { 
+async function findMatchingCoords(routeCoords, instruction) { 
     const response = await fetch("407Zones.JSON");
     const data = await response.json();
-  
     const size = data.Coords.length;
   
     for (let i=0; i<size; i++) {
@@ -28,33 +35,39 @@ async function findMatchingCoords(routeCoords) {
   
       const jsonCoords = {lat: dataFromJSON.Lat, lng: dataFromJSON.Lng};
       const tolerance = dataFromJSON.Tol;
+
+      const areCoordsCloseResults = areCoordsClose(routeCoords, jsonCoords, tolerance);
+      console.log(areCoordsCloseResults)
     
-      if (areCoordsClose(routeCoords, jsonCoords, tolerance)) {
-       
+      if (areCoordsCloseResults == 1) {
+        console.log(dataFromJSON.COMMENT);
+        if (dataFromJSON.COMMENT == "427" || dataFromJSON.COMMENT == "400" || dataFromJSON.COMMENT == "404") {
+            //The tolerance for 427, 400, and 404 has been made bigger to overlap interchanges close to it.
+            const indexChange = dealWithCloseCoords(dataFromJSON.COMMENT, instruction);
+            return {data: data.Coords[i + indexChange], index: i + indexChange}
+        }
+
         return {data: dataFromJSON, index: i};
       } 
     }
+
 } //Finds the first coords in 407Zones.JSON that is considered to be "close" to the input coords, this is used to find the first and last interchange to be used
 
-function dealWithCloseCoords(streetName, instruction) {
-    
-    if (streetName == "Woodbine") {
-        //CHECK IF COORD IS WOODBINE, IF IT IS SCRAP TEXT FROM INSTRUCTION TO CONFIRM IF WOODBINE OR 404
-      } else if (streetName == "404") {
-        //CHECK IF WOODBINE OR LESLIE
-      } else if (streetName == "Leslie") {
-        //CHECK IF 404
-      } else if (streetName == "Jane") {
-        //CHECK IF 400
-      } else if (streetName == "400") {
-        //CHECK IF JANE OR WESTON
-      } else if (streetName == "Weston") {
-        //CHECK IF 400
-      } else if (streetName == "427") {
-        //CHECK IF 27
-      } else if (streetName == "27") {
-        //CHECK IF 427
-      } 
+function dealWithCloseCoords(interchange, instruction) {
+    if (interchange == "404") {
+        if (instruction.includes("Woodbine")) return 1;
+        else if (instruction.includes("Leslie")) return -1;
+        else return 0
+    }
+    if (interchange == "400") {
+        if (instruction.includes("Jane")) return 1;
+        else if (instruction.includes("Weston")) return -1;
+        else return 0
+    }
+    if (interchange == "427") {
+        if (instruction.includes("York Regional Rd 27") || instruction.includes("ON-27")) return 1;
+        else return 0
+    }
 }
 
 function isToll(string) {
@@ -353,7 +366,7 @@ async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, desti
 
                 const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
                 const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
-
+                
                 originToInterchangeTimeArray.push(originToInterchange.routes[0].legs[0].duration.value);
                 interchangeToDestinationTimeArray.push(interchangeToDestination.routes[0].legs[0].duration.value);
             }

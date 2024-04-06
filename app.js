@@ -29,6 +29,7 @@ let isWeekend = false;
 let hasTransponder = false;
 
 async function updateRoute() {
+  console.clear();
   const calculatedRoute = await createRoute(originCoords, destinationCoords, avoidToll);
   displayRoute(calculatedRoute);
   const routeData = await routeInstructions(calculatedRoute);
@@ -84,12 +85,14 @@ async function routeInstructions(directionsResult) {
     
     let currentCoords = {lat: step.start_location.lat(), lng: step.start_location.lng()};
 
-    console.log(instruction)
+    console.log(instruction);
 
     const isCurrentToll = isToll(instruction);
     
     if (isCurrentToll && !wasPreviousToll) {
-      const Start407 = await findMatchingCoords(currentCoords);
+      const prevInstruction = directionsResult.routes[0].legs[0].steps[j-1].instructions;
+      const Start407 = await findMatchingCoords(currentCoords, prevInstruction); 
+      //Use prev instruction here as for 407 entry, the street name is mentioned in the instruction before the one that mentions toll
 
       Start407Data = Start407.data;
       tollStartIndex = Start407.index;
@@ -97,8 +100,9 @@ async function routeInstructions(directionsResult) {
       console.log("ORIGINAL TOLL ENTRY:" + Start407.data.COMMENT); // FOR DEBUGGING
     }
     
-    if (!isCurrentToll && wasPreviousToll) {   
-      const End407 = await findMatchingCoords(currentCoords);
+    if (!isCurrentToll && wasPreviousToll) {  
+      
+      const End407 = await findMatchingCoords(currentCoords, instruction);
       End407Data = End407.data;
       tollEndIndex = End407.index;
 
