@@ -37,10 +37,8 @@ async function findMatchingCoords(routeCoords, instruction) {
       const tolerance = dataFromJSON.Tol;
 
       const areCoordsCloseResults = areCoordsClose(routeCoords, jsonCoords, tolerance);
-      console.log(areCoordsCloseResults)
     
       if (areCoordsCloseResults == 1) {
-        console.log(dataFromJSON.COMMENT);
         if (dataFromJSON.COMMENT == "427" || dataFromJSON.COMMENT == "400" || dataFromJSON.COMMENT == "404") {
             //The tolerance for 427, 400, and 404 has been made bigger to overlap interchanges close to it.
             const indexChange = dealWithCloseCoords(dataFromJSON.COMMENT, instruction);
@@ -114,8 +112,6 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
 
     let entryFee = 4.2;
     if (transponder) entryFee = 1;
-
-    console.log("TRANSPONDER FEE:" + entryFee);
 
     let maxTimeSavedPerDollar = {
         ratio: 0,
@@ -212,22 +208,19 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
             }
         }
     }
-
-    const bestTollEnter = zones.Coords[maxTimeSavedPerDollarRoute.entry].COMMENT;
-    const bestTollExit = zones.Coords[maxTimeSavedPerDollarRoute.exit].COMMENT;
+    
+    const bestTollEnter = zones.Coords[maxTimeSavedPerDollarRoute.entry];
+    const bestTollExit = zones.Coords[maxTimeSavedPerDollarRoute.exit];
 
     if (maxTimeSavedPerDollar == 0 || (tollStart == maxTimeSavedPerDollarRoute.entry && tollEnd == maxTimeSavedPerDollarRoute.exit)) {
         console.log("The most economical toll route is the one provided by Google Maps");
     } else {
         console.log("Entry and exit for most economical toll route is provided below: ");
-        console.log("ENTRY:" + bestTollEnter);
-        console.log("EXIT:" + bestTollExit);
+        console.log("ENTRY:" + bestTollEnter.COMMENT);
+        console.log("EXIT:" + bestTollExit.COMMENT);
     }
 
-    
-    console.log(maxTimeSavedPerDollar)
-
-    return {maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute, bestTollEnter, bestTollExit, tollStart, tollEnd};
+    return {maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute, tollStart, tollEnd};
 }
 
 async function calculateTollCost(minute, weekend, tollStart, tollEnd, maxPrice, transponder) {

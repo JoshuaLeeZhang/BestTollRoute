@@ -33,24 +33,27 @@ async function updateRoute() {
   const calculatedRoute = await createRoute(originCoords, destinationCoords, avoidToll);
   displayRoute(calculatedRoute);
   const routeData = await routeInstructions(calculatedRoute);
+  document.getElementById("bestRoute").innerHTML = "Pending Results";
 
   if (typeof routeData.tollStartIndex == 'undefined') {
-    console.log("No toll needed");
     document.getElementById("bestRoute").innerHTML = "No Toll Needed!";
   } else {
-    // const { maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute, bestTollEnter, bestTollExit, tollStart, tollEnd} = await mostCostEffectiveToll(originCoords, routeData.tollStartIndex, routeData.tollEndIndex, destinationCoords, isWeekend, hasTransponder);
-    // if (bestTollEnter == tollStart && bestTollExit == tollEnd) {
-    //   document.getElementById("bestRoute").innerHTML = "The best route is to enter and exit according to Google Maps' original instructions. Enter at " + bestTollEnter + " and exit at " + bestTollExit;
-    // } else {
-      
-    // document.getElementById("bestRoute").innerHTML = "Enter at " + bestTollEnter + " and exit at " + bestTollExit + " to save " + maxTimeSavedPerDollar.ratio + " seconds per dollar.";
-    // }
+    const { maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute, tollStart, tollEnd} = await mostCostEffectiveToll(originCoords, routeData.tollStartIndex, routeData.tollEndIndex, destinationCoords, isWeekend, hasTransponder);
+    
+    const response = await fetch("407InterchangeNames.JSON");
+    const interchangeNames = await response.json();
+
+    if (maxTimeSavedPerDollarRoute.entry == tollStart && maxTimeSavedPerDollarRoute.exit == tollEnd) {
+      document.getElementById("bestRoute").innerHTML = "The best route is to enter and exit according to Google Maps' original instructions. Enter at " + interchangeNames[maxTimeSavedPerDollarRoute.entry] + " and exit at " + interchangeNames[maxTimeSavedPerDollarRoute.exit];
+    } else {
+      document.getElementById("bestRoute").innerHTML = "Enter at " + interchangeNames[maxTimeSavedPerDollarRoute.entry] + " and exit at " + interchangeNames[maxTimeSavedPerDollarRoute.exit] + " to save " + maxTimeSavedPerDollar.ratio + " seconds per dollar.";
+    }
   }
 }
 
 function displayRoute(calculatedRoute) {
   const map = new google.maps.Map(document.getElementById("map"), {
-    zoom: 7,
+    zoom: 8,
     center: originCoords,
     mapTypeControl: false,
     streetViewControl: false,
@@ -84,8 +87,6 @@ async function routeInstructions(directionsResult) {
     let instruction = step.instructions;
     
     let currentCoords = {lat: step.start_location.lat(), lng: step.start_location.lng()};
-
-    console.log(instruction);
 
     const isCurrentToll = isToll(instruction);
     
