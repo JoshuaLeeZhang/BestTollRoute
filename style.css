@@ -44,7 +44,7 @@
 
     height: 45px;
 
-    top: 300px;
+    top: 345px;
 }
 
 #routeOptions input{
@@ -78,9 +78,9 @@
 }
 
 #routeResults {
-    height: 50px;
+    height: 75px;
 
-    top: 410px;
+    top: 450px;
 }
 
 #map {

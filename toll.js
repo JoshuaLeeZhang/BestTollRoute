@@ -1,100 +1,8 @@
-function areCoordsClose(routeCoords, actualCoords, tolerance) {
-    if (tolerance == -1) return -1;
-
-    const earthRadius = 6371;
-  
-    const diffLat = degToRad(actualCoords.lat - routeCoords.lat);
-    const diffLng = degToRad(actualCoords.lng - routeCoords.lng);
-  
-    const routeLat = degToRad(routeCoords.lat);
-    const actualLat = degToRad(actualCoords.lat);
-  
-    const a = Math.sin(diffLat/2)*Math.sin(diffLat/2) + Math.cos(routeLat)*Math.cos(actualLat)*Math.sin(diffLng/2)*Math.sin(diffLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = earthRadius * c;
-    //https://www.movable-type.co.uk/scripts/latlong.html for haversine formula above
-  
-    if (distance <= tolerance) {
-        return 1;
-    } else {
-        return 0;
-    }
-} //return 1 if two coords are within tolerance distance, 0 if not, and -1 for specific points
-  
-function degToRad(degree) {
-    return degree * (Math.PI / 180);
-} //converts deg to rad, used in areCoordsClose
-  
-async function findMatchingCoords(routeCoords, instruction) { 
-    const response = await fetch("407Zones.JSON");
-    const data = await response.json();
-    const size = data.Coords.length;
-  
-    for (let i=0; i<size; i++) {
-      const dataFromJSON = data.Coords[i];
-  
-      const jsonCoords = {lat: dataFromJSON.Lat, lng: dataFromJSON.Lng};
-      const tolerance = dataFromJSON.Tol;
-
-      const areCoordsCloseResults = areCoordsClose(routeCoords, jsonCoords, tolerance);
-    
-      if (areCoordsCloseResults == 1) {
-        if (dataFromJSON.COMMENT == "427" || dataFromJSON.COMMENT == "400" || dataFromJSON.COMMENT == "404") {
-            //The tolerance for 427, 400, and 404 has been made bigger to overlap interchanges close to it.
-            const indexChange = dealWithCloseCoords(dataFromJSON.COMMENT, instruction);
-            return {data: data.Coords[i + indexChange], index: i + indexChange}
-        }
-
-        return {data: dataFromJSON, index: i};
-      } 
-    }
-
-} //Finds the first coords in 407Zones.JSON that is considered to be "close" to the input coords, this is used to find the first and last interchange to be used
-
-function dealWithCloseCoords(interchange, instruction) {
-    if (interchange == "404") {
-        if (instruction.includes("Woodbine")) return 1;
-        else if (instruction.includes("Leslie")) return -1;
-        else return 0
-    }
-    if (interchange == "400") {
-        if (instruction.includes("Jane")) return 1;
-        else if (instruction.includes("Weston")) return -1;
-        else return 0
-    }
-    if (interchange == "427") {
-        if (instruction.includes("York Regional Rd 27") || instruction.includes("ON-27")) return 1;
-        else return 0
-    }
-}
-
 function isToll(string) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(string, 'text/html');
     return doc.body.textContent.includes('Toll road');
 } //Returns true if a string contains "Toll road". This is used to find the first and last interchange
-
-function isGoingEast(string) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(string, 'text/html');
-    if (doc.body.textContent.includes('ON-407 W')) {
-        return false;
-    } else {
-        return true;
-    }
-} //Checks if the 407 direction is east (true) or west (false)
-  
-async function calculateTollInfo (tollStart, tollEnd) {
-    let tollRoute = await createRoute(tollStart, tollEnd, true);
-    let tollInfo = document.getElementById("tollInfo");
-
-    tollInfo.innerHTML = '';
-
-    let route = tollRoute.routes[0].legs[0];
-
-    tollInfo.innerHTML += '<p>' + "TIME: " + route.duration.text + '</p>';
-    tollInfo.innerHTML += '<p>' + "DISTANCE: " + route.distance.value + '</p>';
-} //Unused function that gives basic info about a toll route (duration and distance)
 
 async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinationCoords, weekend, transponder) {
     const response = await fetch("407Zones.JSON");
@@ -208,17 +116,6 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
             }
         }
     }
-    
-    const bestTollEnter = zones.Coords[maxTimeSavedPerDollarRoute.entry];
-    const bestTollExit = zones.Coords[maxTimeSavedPerDollarRoute.exit];
-
-    if (maxTimeSavedPerDollar == 0 || (tollStart == maxTimeSavedPerDollarRoute.entry && tollEnd == maxTimeSavedPerDollarRoute.exit)) {
-        console.log("The most economical toll route is the one provided by Google Maps");
-    } else {
-        console.log("Entry and exit for most economical toll route is provided below: ");
-        console.log("ENTRY:" + bestTollEnter.COMMENT);
-        console.log("EXIT:" + bestTollExit.COMMENT);
-    }
 
     return {maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute, tollStart, tollEnd};
 }
@@ -293,22 +190,6 @@ async function determine407Rate(minute, east, weekend) {
 
     return 0;
 } //returns the price in cents per km at various points on the 407
-
-function haveCommonNumber(arr1, arr2) {
-    return arr1.some(item => arr2.includes(item));
-} //returns true if two arrays have a common number, false if not.
-
-function findCommonNumbers(arr1, arr2) {
-    let common = [];
-
-    for (let i = 0; i < arr1.length; i++) {
-        if (arr2.includes(arr1[i])) {
-            common.push(arr1[i]);
-        }
-    }
-
-    return common;
-} //returns array of common numbers
 
 function currentTime() {
     let now = new Date();
@@ -422,23 +303,3 @@ async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, desti
 
     return {originToInterchangeTimeMap, interchangeToDestinationTimeMap};
 } //returns originToInterchangeTimes and interchangeToDestinationTimes in seconds
-
-
-async function createRoute(origin, destination, toll) {
-    return new Promise((resolve, reject) => {
-      const direction = new google.maps.DirectionsService();
-  
-      direction.route({
-        origin: origin,
-        destination: destination,
-        travelMode: google.maps.TravelMode.DRIVING,
-        avoidTolls: toll
-      }, 
-  
-        (response, status) => {
-          if (status == "OK") resolve(response);
-          else reject("Request failed due to: " + status);
-        }
-      )
-    })
-  }
