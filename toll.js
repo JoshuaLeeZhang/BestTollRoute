@@ -4,7 +4,7 @@ function isToll(string) {
     return doc.body.textContent.includes('Toll road');
 } //Returns true if a string contains "Toll road". This is used to find the first and last interchange
 
-async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinationCoords, weekend, transponder) {
+async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinationCoords) {
     const response = await fetch("407Zones.JSON");
     const zones = await response.json();
 
@@ -14,19 +14,17 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
     const fromInterchangeTimes = interchangeTimes.interchangeToDestinationTimeMap;
 
     const originToDestinationNoToll = await createRoute(originCoords, destinationCoords, true);
-    const originToDestinationNoTollTime = originToDestinationNoToll.routes[0].legs[0].duration.value/60; //This calculates the time if no toll is taken, this will be used for comparison
+    const originToDestinationNoTollTime = originToDestinationNoToll.routes[0].legs[0].duration.value; //This calculates the time if no toll is taken, this will be used for comparison
 
     const goingEast = tollStart < tollEnd; // Determine the direction of travel on the 407 toll route. The toll interchanges on the 407 are indexed such that their index value increases from west to east. Ex. index 0 is the most westward interchange 
 
     let entryFee = 4.2;
-    if (transponder) entryFee = 1;
+    if (hasTransponder) entryFee = 1;
 
-    let maxTimeSavedPerDollar = {
+    let bestRoute = {
         ratio: 0,
         timeSaved: 0,
-        dollar: 0
-    };
-    let maxTimeSavedPerDollarRoute = {
+        dollar: 0,
         entry: tollStart,
         exit: tollEnd
     }
@@ -56,18 +54,18 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
 
                     const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
 
-                    const maxAllowableTollCost = timeSaved/maxTimeSavedPerDollar;
+                    let maxAllowableTollCost;
+                    if (bestRoute.ratio == 0) maxAllowableTollCost = -1
+                    else maxAllowableTollCost = timeSaved/bestRoute.ratio;
 
-                    const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j, maxAllowableTollCost, entryFee);
+                    const tollCost = await calculateTollCost(entryTimeOn407, i, j, maxAllowableTollCost, entryFee);
     
                     if (tollCost != -1) { //calculateTollCost will return -1 if the route cannot be more effective
-                        maxTimeSavedPerDollar.ratio = timeSaved/tollCost;
-                        maxTimeSavedPerDollar.dollar = tollCost;
-                        maxTimeSavedPerDollar.timeSaved = timeSaved;
-                        maxTimeSavedPerDollarRoute = {
-                            entry: i,
-                            exit: j
-                        }
+                        bestRoute.ratio = timeSaved/tollCost
+                        bestRoute.dollar = tollCost
+                        bestRoute.timeSaved = timeSaved
+                        bestRoute.entry = i
+                        bestRoute.exit = j
                     }
                 }
 
@@ -98,18 +96,18 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
 
                     const entryTimeOn407 = (toInterchangeTimes.get(i) + currentTime());
 
-                    const maxAllowableTollCost = timeSaved/maxTimeSavedPerDollar; 
+                    let maxAllowableTollCost;
+                    if (bestRoute.ratio == 0) maxAllowableTollCost = -1
+                    else maxAllowableTollCost = timeSaved/bestRoute.ratio;
 
-                    const tollCost = await calculateTollCost(entryTimeOn407, weekend, i, j, maxAllowableTollCost, entryFee);
+                    const tollCost = await calculateTollCost(entryTimeOn407, i, j, maxAllowableTollCost, entryFee);
     
                     if (tollCost != -1) { //calculateTollCost will return -1 if the route cannot be more effective
-                        maxTimeSavedPerDollar.ratio = timeSaved/tollCost; // seconds per cent
-                        maxTimeSavedPerDollar.dollar = tollCost;
-                        maxTimeSavedPerDollar.timeSaved = timeSaved;
-                        maxTimeSavedPerDollarRoute = {
-                            entry: i,
-                            exit: j
-                        }
+                        bestRoute.ratio = timeSaved/tollCost
+                        bestRoute.dollar = tollCost
+                        bestRoute.timeSaved = timeSaved
+                        bestRoute.entry = i
+                        bestRoute.exit = j
                     }
                 }
 
@@ -117,20 +115,21 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
         }
     }
 
-    return {maxTimeSavedPerDollar, maxTimeSavedPerDollarRoute, tollStart, tollEnd};
+    return {bestRoute, tollStart, tollEnd};
 }
 
-async function calculateTollCost(minute, weekend, tollStart, tollEnd, maxPrice, transponder) {
+async function calculateTollCost(second, tollStart, tollEnd, maxPrice, entryFee) {
     const response = await fetch("407Zones.JSON");
     const data = await response.json();
     const data407 = data.Coords;
 
-    let price = transponder;
+    let price = entryFee;
 
-    if (price > maxPrice) return -1; //If price is already greater than max price allowed, return -1
+    if (price > maxPrice && maxPrice != -1) return -1; //If price is already greater than max price allowed, return -1
    
     const goingEast = tollStart < tollEnd; //checks if going east
-    const rate407 = await determine407Rate(minute, goingEast, weekend); //returns rate for 407 in each zone
+    const minute = second/60
+    const rate407 = await determine407Rate(minute, goingEast); //returns rate for 407 in each zone
 
     function iterateTolls(i) {
         if (goingEast) return i <= tollEnd;
@@ -153,7 +152,7 @@ async function calculateTollCost(minute, weekend, tollStart, tollEnd, maxPrice, 
         let incrementPrice = distanceToNext * rate407[currentZone.toString()];
         price += incrementPrice;
         
-        if (price > maxPrice) return -1;
+        if (price > maxPrice && maxPrice != -1) return -1;
     }
     
     return price;
@@ -162,17 +161,17 @@ async function calculateTollCost(minute, weekend, tollStart, tollEnd, maxPrice, 
   //If price has exceeded, that means it is not possible that this route can be more cost effective than the most effective route.
   //Returns price in cents
 
-async function determine407Rate(minute, east, weekend) {
+async function determine407Rate(minute, east) {
     let response;
     
     if (east) {
-        if (weekend) {
+        if (isWeekend) {
             response = await fetch("407EastWeekend.JSON");
         } else {
             response = await fetch("407EastWeekday.JSON");
         }
     } else {
-        if (weekend) {
+        if (isWeekend) {
             response = await fetch("407WestWeekend.JSON");
         } else {
             response = await fetch("407WestWeekday.JSON");
