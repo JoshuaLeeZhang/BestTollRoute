@@ -4,14 +4,20 @@ function isToll(string) {
     return doc.body.textContent.includes('Toll road');
 } //Returns true if a string contains "Toll road". This is used to find the first and last interchange
 
+let toICMap = new Map(); //toInterchangeMap - Key is interchange index and value is time from origin to interchange in seconds
+let fromICMap = new Map(); //fromInterchangeMap - Key is interchange index and value is time from interchange to desination in seconds
+
+let fastestIndexOnLargeICsENTRY = new Map()
+let fastestIndexOnLargeICsEXIT = new Map()
+
+//ON403 = 6, ON401 = 9, ON410 = 13, ON427 = 18, ON400 = 22, ON404 = 30
+
+
 async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinationCoords) {
     const response = await fetch("407Zones.JSON");
     const zones = await response.json();
 
-    const interchangeTimes = await calculateInterchangeTimes(originCoords, tollStart, tollEnd, destinationCoords);
-
-    const toInterchangeTimes = interchangeTimes.toInterchangeMap;
-    const fromInterchangeTimes = interchangeTimes.fromInterchangeMap;
+    await calculateInterchangeTimes(originCoords, tollStart, tollEnd, destinationCoords);
 
     const noTollRoute = await createRoute(originCoords, destinationCoords, true);
     const noTollRouteTime = noTollRoute.routes[0].legs[0].duration.value; //This calculates the time if no toll is taken, this will be used for comparison
@@ -39,7 +45,7 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
         for (let j = goingEast ? i + 1 : i - 1; goingEast ? j <= tollEnd : j >= tollEnd; goingEast ? j++ : j--) {
 
             
-            let totalTime = toInterchangeTimes.get(i) + fromInterchangeTimes.get(j);
+            let totalTime = toICMap.get(i) + fromICMap.get(j);
 
             if (totalTime > noTollRouteTime) continue //if total time from traveling to and from each interchange is already greater than noTollTime, continues
 
@@ -55,7 +61,7 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
 
             const timeSaved = noTollRouteTime - totalTime;
 
-            const entryTimeOn407 = toInterchangeTimes.get(i) + currentTime();
+            const entryTimeOn407 = toICMap.get(i) + currentTime();
 
             let maxAllowableTollCost;
             if (bestRoute.ratio == 0) maxAllowableTollCost = -1
@@ -64,15 +70,17 @@ async function mostCostEffectiveToll(originCoords, tollStart, tollEnd, destinati
             const tollCost = await calculateTollCost(entryTimeOn407, i, j, maxAllowableTollCost, entryFee);
 
             if (tollCost != -1) { //calculateTollCost will return -1 if the route cannot be more effective
-                bestRoute.ratio = timeSaved/tollCost
-                bestRoute.cents = tollCost
-                bestRoute.timeSaved = timeSaved
-                bestRoute.entry = i
-                bestRoute.exit = j
+                bestRoute = {
+                    ratio: timeSaved/tollCost,
+                    cents: tollCost,
+                    timeSaved: timeSaved,
+                    entry: i,
+                    exit: j
+                }
             }
         }
     }
-    console.log(bestRoute)
+
     return {bestRoute, tollStart, tollEnd};
 }
 
@@ -149,64 +157,58 @@ function currentTime() {
 } //gets current time in seconds
 
 async function calculateInterchangeTimes(originCoords, tollStart, tollEnd, destinationCoords) {
-    let toInterchangeMap = new Map();
-    let fromInterchangeMap = new Map();
-
-    const interchangeResponse = await fetch("407Interchanges.JSON");
-    const interchangeData = await interchangeResponse.json();
+    const ICResponse = await fetch("407Interchanges.JSON");
+    const ICData = await ICResponse.json();
 
     const goingEast = tollStart < tollEnd;
 
-    const largeInterchanges = ["403", "401", "410", "427", "400", "404"]
+    const largeICs = ["403", "401", "410", "427", "400", "404"]
 
     for (let i = tollStart; goingEast ? i <= tollEnd : i >= tollEnd; goingEast ? i++: i--) { //This block calculates the time to and from all entrys and exits between the fastest entrys and exits 
-        let currentInterchangeCoords;
-        let toInterchangeTime;
-        let fromInterchangeTime;
+        let toICTime;
+        let fromICTime;
 
+        if (toICMap.has(i)) continue // if already in map, do not compute. Only checks toICMap as if it exists in toICMap, it will exist in fromICMap
 
-        if (!largeInterchanges.includes(interchangeData[i].COMMENT)) {
-            currentInterchangeCoords = {
-                lat: interchangeData[i].Lat,
-                lng: interchangeData[i].Lng
-            }
+        if (!largeICs.includes(ICData[i].COMMENT)) {
+            const currICCoords = {lat: ICData[i].Lat, lng: ICData[i].Lng}
 
-            const toInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
-            const fromInterchange = await createRoute(currentInterchangeCoords, destinationCoords, true);
+            const toICRoute = await createRoute(originCoords, currICCoords, true);
+            const fromICRoute = await createRoute(currICCoords, destinationCoords, true);
     
-            toInterchangeTime = toInterchange.routes[0].legs[0].duration.value;
-            fromInterchangeTime = fromInterchange.routes[0].legs[0].duration.value;
+            toICTime = toICRoute.routes[0].legs[0].duration.value;
+            fromICTime = fromICRoute.routes[0].legs[0].duration.value;
 
         } else {
-            let length = interchangeData[i].Coords.length;
-            
-            let toInterchangeTimes = [];
-            let fromInterchangeTimes = [];
+            let numCoordsToCompare = ICData[i].Coords.length;
 
-            for (let j=0; j<length; j++) {
+            for (let j=0; j<numCoordsToCompare; j++) {
 
-                currentInterchangeCoords = {
-                    lat: interchangeData[i].Coords[j].Lat,
-                    lng: interchangeData[i].Coords[j].Lng
-                }
+                const currICCoords = {lat: ICData[i].Coords[j].Lat, lng: ICData[i].Coords[j].Lng}
 
-                const originToInterchange = await createRoute(originCoords, currentInterchangeCoords, true);
-                const interchangeToDestination = await createRoute(currentInterchangeCoords, destinationCoords, true);
+                const originToIC = await createRoute(originCoords, currICCoords, true);
+                const ICToDesination = await createRoute(currICCoords, destinationCoords, true);
+
+                const currToICTime = originToIC.routes[0].legs[0].duration.value
+                const currFromICTime = ICToDesination.routes[0].legs[0].duration.value
                 
-                toInterchangeTimes.push(originToInterchange.routes[0].legs[0].duration.value);
-                fromInterchangeTimes.push(interchangeToDestination.routes[0].legs[0].duration.value);
+                if (toICTime == undefined) {
+                    toICTime = currToICTime
+                    fromICTime = currFromICTime
+                    fastestIndexOnLargeICs.entry.
+                } else if (currToICTime < toICTime) {
+                    toICTime = currToICTime
+                    //assign index for this interchange
+                } else if (currFromICTime < fromICTime) {
+                    fromICTime = currFromICTime
+                    //assign index for this interchange
+                }
             }
-
-            toInterchangeTime = Math.min(...toInterchangeTimes);
-            fromInterchangeTime = Math.min(...fromInterchangeTimes);
         }
 
-        console.log(interchangeData[i].COMMENT + "| toInterchange: " + toInterchangeTime + "| fromInterchange: " + fromInterchangeTime)
+        console.log(ICData[i].COMMENT + "| toInterchange: " + toICTime + "| fromInterchange: " + fromICTime)
 
-        toInterchangeMap.set(i, toInterchangeTime);
-        fromInterchangeMap.set(i, fromInterchangeTime);
+        toICMap.set(i, toICTime);
+        fromICMap.set(i, fromICTime);
     }
-    
-
-    return {toInterchangeMap, fromInterchangeMap};
-} //returns originToInterchangeTimes and interchangeToDestinationTimes in seconds
+} //adds originToInterchangeTimes and interchangeToDestinationTimes in seconds
