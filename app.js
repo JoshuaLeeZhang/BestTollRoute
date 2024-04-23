@@ -1,3 +1,17 @@
+let ICNames
+let ICZones
+let ICCoords
+
+async function loadJSON() {
+  const ICNamesResponse = await fetch("407InterchangeNames.JSON");
+  const ICZonesResponse = await fetch("407Zones.JSON");
+  const ICCoordsResponse = await fetch("407Interchanges.JSON");
+
+  ICNames = await ICNamesResponse.json();
+  ICZones = await ICZonesResponse.json();
+  ICCoords = await ICCoordsResponse.json();
+}
+
 function loadMapScript() {
   const apiKey = document.getElementById('api-key').value;
   
@@ -5,6 +19,8 @@ function loadMapScript() {
   script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&libraries=places&callback=initGoogleMaps`;
 
   document.head.appendChild(script);
+
+  loadJSON()
 }
 
 function initGoogleMaps() {
@@ -13,7 +29,7 @@ function initGoogleMaps() {
 }
 
 function drawNewRoute() {
-  drawTollRoute(drawTollRouteData.tollStart, drawTollRouteData.tollEnd);
+  if (routeDrawingData.tollStart != undefined && routeDrawingData.tollEnd != undefined) drawTollRoute(routeDrawingData.tollStart, routeDrawingData.tollEnd);
 }
 
 let originCoords;
@@ -21,7 +37,7 @@ let destinationCoords;
 let isWeekend = false;
 let hasTransponder = false;
 
-let drawTollRouteData = {
+let routeDrawingData = {
   tollStart: undefined,
   tollEnd: undefined
 } //this is to be used for drawNewRoute
@@ -39,17 +55,14 @@ async function updateRoute() {
   } else {
     const { bestRoute, tollStart, tollEnd} = await mostCostEffectiveToll(originCoords, routeData.tollStartIndex, routeData.tollEndIndex, destinationCoords);
     
-    const interchangeNamesJSON = await fetch("407InterchangeNames.JSON");
-    const interchangeNames = await interchangeNamesJSON.json();
+    const minutesPerDollar = parseFloat((bestRoute.ratio/60*100).toFixed(2))
+    const dollarCost = parseFloat((bestRoute.cents/100).toFixed(2))
 
-    if (bestRoute.entry == tollStart && bestRoute.exit == tollEnd) {
-      document.getElementById("bestRoute").innerHTML = "The best route is to enter and exit according to Google Maps' original instructions. Enter at " + interchangeNames[bestRoute.entry] + " and exit at " + interchangeNames[bestRoute.exit];
-    } else {
-      document.getElementById("bestRoute").innerHTML = "Enter at " + interchangeNames[bestRoute.entry] + " and exit at " + interchangeNames[bestRoute.exit] + " to save " + bestRoute.ratio + " seconds per dollar.";
-    }
+    if (bestRoute.entry == tollStart && bestRoute.exit == tollEnd) document.getElementById("bestRoute").innerHTML = `The best route is to enter and exit according to Google Maps' original instructions. Enter at ${ICNames[bestRoute.entry]} and exit at ${ICNames[bestRoute.exit]}. You will save ${minutesPerDollar} minutes per dollar for ${dollarCost} dollars total`
+    else document.getElementById("bestRoute").innerHTML = `Enter at ${ICNames[bestRoute.entry]} and exit at ${ICNames[bestRoute.exit]} to save ${minutesPerDollar} minutes per dollar for ${dollarCost} dollars total.`
 
-    drawTollRouteData.tollStart = bestRoute.entry;
-    drawTollRouteData.tollEnd = bestRoute.exit
+    routeDrawingData.tollStart = bestRoute.entry;
+    routeDrawingData.tollEnd = bestRoute.exit
   }
 }
 
@@ -116,7 +129,7 @@ async function createRoute(origin, destination, avoidToll) {
 
       (response, status) => {
         if (status == "OK") resolve(response);
-        else reject("Request failed due to: " + status);
+        else reject(`Error: ${status}`);
       }
     )
   })

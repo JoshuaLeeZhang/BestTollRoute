@@ -58,17 +58,35 @@ async function drawTollRoute(tollEntryIndex, tollExitIndex) {
         }
     }); //GREEN
 
-    const response = await fetch("407Interchanges.JSON");
-    const data = await response.json();
+    let tollEntryCoords = {lat: undefined, lng: undefined}
+    let tollExitCoords = {lat: undefined, lng: undefined}
 
-    const tollEntryCoords = {
-        lat: data[tollEntryIndex].Lat,
-        lng: data[tollEntryIndex].Lng
+    if (fastestIndexOnLargeICsENTRY.has(tollEntryIndex)) {
+        fastedIndexOnIC = fastestIndexOnLargeICsENTRY.get(tollEntryIndex)
+
+        tollEntryCoords = {
+            lat: ICCoords[tollEntryIndex].Coords[fastedIndexOnIC].Lat,
+            lng: ICCoords[tollEntryIndex].Coords[fastedIndexOnIC].Lng
+        }
+    } else {
+        tollEntryCoords = {
+            lat: ICCoords[tollEntryIndex].Lat,
+            lng: ICCoords[tollEntryIndex].Lng
+        }
     }
 
-    const tollExitCoords = {
-        lat: data[tollExitIndex].Lat,
-        lng: data[tollExitIndex].Lng
+    if (fastestIndexOnLargeICsEXIT.has(tollExitIndex)) {
+        fastedIndexOnIC = fastestIndexOnLargeICsEXIT.get(tollExitIndex)
+
+        tollExitCoords = {
+            lat: ICCoords[tollExitIndex].Coords[fastedIndexOnIC].Lat,
+            lng: ICCoords[tollExitIndex].Coords[fastedIndexOnIC].Lng
+        }
+    } else {
+        tollExitCoords = {
+            lat: ICCoords[tollExitIndex].Lat,
+            lng: ICCoords[tollExitIndex].Lng
+        }
     }
 
     const requestTO407 = {
