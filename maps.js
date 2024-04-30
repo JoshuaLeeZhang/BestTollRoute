@@ -8,7 +8,7 @@ function initMap() {
     });
 }
 
-function displayRoute(calculatedRoute) {
+function displayRoute(originCoords, calculatedRoute) {
     const map = new google.maps.Map(document.getElementById("map"), {
       zoom: 8,
       center: originCoords,
