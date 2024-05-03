@@ -25,7 +25,7 @@ function onOriginPlaceChanged(originAutoComplete) {
   } else {
     const orgLat = place.geometry.location.lat();
     const orgLng = place.geometry.location.lng();
-    originCoords = {lat: orgLat, lng: orgLng};
+    currentOriginCoords = {lat: orgLat, lng: orgLng};
   }
 }
 
@@ -36,6 +36,6 @@ function onDestinationPlaceChanged(destinationAutocomplete) {
   } else {
     const desLat = place.geometry.location.lat();
     const desLng = place.geometry.location.lng();
-    destinationCoords = {lat: desLat, lng: desLng};
+    currentDestinationCoords = {lat: desLat, lng: desLng};
   }
 }
