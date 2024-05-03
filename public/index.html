@@ -7,12 +7,9 @@
     </head>
     <body>
         <div id = "routeCreate" class = "routePanels">
-            <input id="api-key" type="text" placeholder="Enter Google Maps API Key">
             <input id = "origin" type = "text" placeholder = "Enter a origin">
             <input id = "destination" type = "text" placeholder = "Enter a destination">
-            <button type = "button" onclick="loadMapScript()">Load Map</button>
             <button type = "button" onclick="updateRoute()">Create Route</button>
-            <button type = "button" onclick="drawNewRoute()">Draw 407 Route</button>
         </div>
 
         <div id = "routeOptions" class = "routePanels">
@@ -32,12 +29,13 @@
                 <p id = "bestRoute"></p>
             </div>
         </div>
-         
-        <div id="map"></div>
+
+        <div id = 'map'></div>
         
+        <script defer src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyAZLDgHNtqUt0_Eqw-6wgriSOCaMzNV4NY&loading=async&libraries=places&callback=initGoogleMaps"></script>
         <script src = "app.js"></script>
         <script src = "autocomplete.js"></script>
-        <script src = "route.js"></script>
         <script src = "maps.js"></script>
+        
     </body>     
 </html>

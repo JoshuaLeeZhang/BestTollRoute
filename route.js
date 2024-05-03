@@ -1,9 +1,15 @@
+const {apiKey, googleMaps} = require('./server.js')
+
 class Route {
     constructor(originCoords, destinationCoords, hasTransponder, isWeekend) {
         this.originCoords = originCoords
         this.destinationCoords = destinationCoords
         this.hasTransponder = hasTransponder
         this.isWeekend = isWeekend
+
+        this.usedToll = null
+        this.defaultRoute = null
+        this.goingEast = null
 
         this.Start407Data = null
         this.End407Data = null
@@ -12,35 +18,39 @@ class Route {
 
         this.currentTime = this.getCurrentTime()
 
-        this.goingEast = null
+        this.toICMap = new Map()
+        this.fromICMap = new Map()
+
+        this.fastestIndexOnLargeICsENTRY = new Map()
+        this.fastestIndexOnLargeICsEXIT = new Map()
 
         this.bestRoute = {
             ratio: 0,
             timeSaved: 0,
             cents: 0,
             entry: null,
-            exit: null
+            exit: null,
+            entryCoords: {lat: null, lng: null},
+            exitCoords: {lat: null, lng: null}
         }
-
-        this.toICMap = new Map()
-        this.fromICMap = new Map()
-
-        this.fastestIndexOnLargeICsENTRY = new Map()
-        this.fastestIndexOnLargeICsEXIT = new Map()
     }
 
     async createSmartRoute() {
-        const defaultRoute = await this.createRoute(this.originCoords, this.destinationCoords, false);
-        displayRoute(this.originCoords, defaultRoute);
-        await this.routeInstructions(defaultRoute);
+        this.defaultRoute = await this.createRoute(this.originCoords, this.destinationCoords, false)
+        console.log(this.defaultRoute)
+        this.routeInstructions()
 
         this.goingEast = this.tollStartIndex < this.tollEndIndex // Determine the direction of travel on the 407 toll route. The toll interchanges on the 407 are indexed such that their index value increases from west to east. Ex. index 0 is the most westward interchange 
-      
-        if (typeof this.tollStartIndex == 'undefined') {
+
+        if (this.tollStartIndex == null) {
+            this.usedToll = false
             return "NO TOLL NEEDED"
         } else {
+            this.usedToll = true
             await this.calculateInterchangeTimes();
             await this.mostCostEffectiveToll()
+
+            this.bestRouteIndexsToCoords()
             
             const bestEntryICName = ICNames[this.bestRoute.entry]
             const bestExitICName = ICNames[this.bestRoute.exit]
@@ -67,10 +77,9 @@ class Route {
             exit: this.tollEndIndex
         }
     
-        const directTollRoute = await this.createRoute(this.originCoords, this.destinationCoords, false);
-        const directTollRouteTime = directTollRoute.routes[0].legs[0].duration.value;
+        const defaultRouteTime = this.defaultRoute.routes[0].legs[0].duration.value;
     
-        this.bestRoute.timeSaved = noTollRouteTime - directTollRouteTime;
+        this.bestRoute.timeSaved = noTollRouteTime - defaultRouteTime;
         this.bestRoute.cents = this.calculateTollCost(this.toICMap.get(this.tollStartIndex) + this.currentTime, this.tollStartIndex, this.tollEndIndex, -1, entryFee) 
         this.bestRoute.ratio = this.bestRoute.timeSaved/this.bestRoute.cents
 
@@ -111,35 +120,6 @@ class Route {
                 }
             }
         }
-    }
-
-    async calculateTollCost(second, ICEntryIndex, ICExitIndex, maxPrice, entryFee) {
-        let price = entryFee;
-    
-        if (price > maxPrice && maxPrice != -1) return -1; //If price is already greater than max price allowed, return -1
-       
-        const rate407 = await this.determine407Rate(second) //returns rate for 407 in each zone
-    
-        for (let i = ICEntryIndex; this.goingEast ? i <= ICExitIndex : i >= ICExitIndex; this.goingEast ? i++: i--) {
-            let distanceToNext;
-    
-            if (this.goingEast) distanceToNext = ICZones[i].EAST;
-            else distanceToNext = ICZones[i].WEST;
-    
-            let currentZone = ICZones[i].ZONE[0];
-            if (this.goingEast && ICZones[i].ZONE.length == 2) currentZone = ICZones[i].ZONE[1]; //If interchange is between two zones, choose the one going east, which is at index 1
-            currentZone--;
-            //currentZone is subtracted by 1 to align with rate407 array indices.
-            //Ex. If currentZone = 3, the corresponding zone in rate407 is "3" BUT "3" is at index 2.
-            //Zone 1 is at index 0, Zone 2 is at index 1, Zone 3 is at index 2, Zone 4 is at index 3
-    
-            let incrementPrice = distanceToNext * rate407[currentZone.toString()];
-            price += incrementPrice;
-            
-            if (price > maxPrice && maxPrice != -1) return -1;
-        }
-        
-        return price;
     }
 
     async calculateInterchangeTimes() {
@@ -193,24 +173,69 @@ class Route {
         }
     } //adds originToInterchangeTimes and interchangeToDestinationTimes in seconds
 
-    async determine407Rate(seconds) {
-        let response;
+    async createRoute(origin, destination, avoidToll) {
+        const originData = `${origin.lat},${origin.lng}`
+        const destinationData = `${destination.lat},${destination.lng}`
+
+        const direction = await googleMaps.directions({
+            params: {
+                origin: originData,
+                destination: destinationData,
+                mode: 'driving',
+                avoid: avoidToll ? ['tolls'] : [],
+                key: apiKey
+            }
+        })
+
+        return direction.data
+    } //Calls Google Maps Direction API to create a route
+
+    calculateTollCost(second, ICEntryIndex, ICExitIndex, maxPrice, entryFee) {
+        let price = entryFee;
+    
+        if (price > maxPrice && maxPrice != -1) return -1; //If price is already greater than max price allowed, return -1
+       
+        const rate407 = this.determine407Rate(second) //returns rate for 407 in each zone
+    
+        for (let i = ICEntryIndex; this.goingEast ? i <= ICExitIndex : i >= ICExitIndex; this.goingEast ? i++: i--) {
+            let distanceToNext;
+    
+            if (this.goingEast) distanceToNext = ICZones[i].EAST;
+            else distanceToNext = ICZones[i].WEST;
+    
+            let currentZone = ICZones[i].ZONE[0];
+            if (this.goingEast && ICZones[i].ZONE.length == 2) currentZone = ICZones[i].ZONE[1]; //If interchange is between two zones, choose the one going east, which is at index 1
+            currentZone--;
+            //currentZone is subtracted by 1 to align with rate407 array indices.
+            //Ex. If currentZone = 3, the corresponding zone in rate407 is "3" BUT "3" is at index 2.
+            //Zone 1 is at index 0, Zone 2 is at index 1, Zone 3 is at index 2, Zone 4 is at index 3
+    
+            let incrementPrice = distanceToNext * rate407[currentZone.toString()];
+            price += incrementPrice;
+            
+            if (price > maxPrice && maxPrice != -1) return -1;
+        }
+        
+        return price;
+    }
+    
+    determine407Rate(seconds) {
+        let data;
         
         if (this.goingEast) {
-            if (isWeekend) {
-                response = await fetch("./data/407EastWeekend.JSON");
+            if (this.isWeekend) {
+                data = EastWeekend
             } else {
-                response = await fetch("./data/407EastWeekday.JSON");
+                data = EastWeekday
             }
         } else {
-            if (isWeekend) {
-                response = await fetch("./data/407WestWeekend.JSON");
+            if (this.isWeekend) {
+                data = WestWeekend
             } else {
-                response = await fetch("./data/407WestWeekday.JSON");
+                data = WestWeekday
             }
         }
     
-        const data = await response.json();
         const size = data.length;
         const minute = seconds/60
     
@@ -223,41 +248,22 @@ class Route {
         return -1;
     } //returns the price in cents per km at various points on the 407
 
-    async createRoute(origin, destination, avoidToll) {
-        return new Promise((resolve, reject) => {
-          const direction = new google.maps.DirectionsService();
-      
-          direction.route({
-            origin: origin,
-            destination: destination,
-            travelMode: google.maps.TravelMode.DRIVING,
-            avoidTolls: avoidToll
-          }, 
-      
-            (response, status) => {
-              if (status == "OK") resolve(response);
-              else reject(`Error: ${status}`);
-            }
-          )
-        })
-    }
-
-    async routeInstructions(directionsResult) {      
+    routeInstructions() {      
         let wasPreviousToll = false
-        let numSteps = directionsResult.routes[0].legs[0].steps.length
+        let numSteps = this.defaultRoute.routes[0].legs[0].steps.length
       
         for (let j = 0; j < numSteps; j++) {
-          let step = directionsResult.routes[0].legs[0].steps[j];
+          let step = this.defaultRoute.routes[0].legs[0].steps[j];
       
-          let instruction = step.instructions;
-          
-          let currentCoords = {lat: step.start_location.lat(), lng: step.start_location.lng()};
-      
+          let instruction = step.html_instructions
+
+          let currentCoords = {lat: step.start_location.lat, lng: step.start_location.lng};
+        
           const isCurrentToll = this.isToll(instruction);
           
           if (isCurrentToll && !wasPreviousToll) {
-            const prevInstruction = directionsResult.routes[0].legs[0].steps[j-1].instructions;
-            const Start407 = await this.findMatchingCoords(currentCoords, prevInstruction); 
+            const prevInstruction = this.defaultRoute.routes[0].legs[0].steps[j-1].instructions;
+            const Start407 = this.findMatchingCoords(currentCoords, prevInstruction); 
             //Use prev instruction here as for 407 entry, the street name is mentioned in the instruction before the one that mentions toll
       
             this.Start407Data = Start407.data;
@@ -268,7 +274,7 @@ class Route {
           
           if (!isCurrentToll && wasPreviousToll) {  
             
-            const End407 = await this.findMatchingCoords(currentCoords, instruction);
+            const End407 = this.findMatchingCoords(currentCoords, instruction);
             this.End407Data = End407.data;
             this.tollEndIndex = End407.index;
       
@@ -280,7 +286,40 @@ class Route {
         }      
     }
 
-    async findMatchingCoords(routeCoords, instruction) { 
+    bestRouteIndexsToCoords() {
+        const tollEntryIndex = this.bestRoute.entry
+        const tollExitIndex = this.bestRoute.exit
+
+        if (this.fastestIndexOnLargeICsENTRY.has(tollEntryIndex)) {
+            const fastedIndexOnIC = this.fastestIndexOnLargeICsENTRY.get(tollEntryIndex)
+    
+            this.bestRoute.entryCoords = {
+                lat: ICCoords[tollEntryIndex].Coords[fastedIndexOnIC].Lat,
+                lng: ICCoords[tollEntryIndex].Coords[fastedIndexOnIC].Lng
+            }
+        } else {
+            this.bestRoute.entryCoords = {
+                lat: ICCoords[tollEntryIndex].Lat,
+                lng: ICCoords[tollEntryIndex].Lng
+            }
+        }
+    
+        if (this.fastestIndexOnLargeICsEXIT.has(tollExitIndex)) {
+            const fastedIndexOnIC = this.fastestIndexOnLargeICsEXIT.get(tollExitIndex)
+    
+            this.bestRoute.exitCoords = {
+                lat: ICCoords[tollExitIndex].Coords[fastedIndexOnIC].Lat,
+                lng: ICCoords[tollExitIndex].Coords[fastedIndexOnIC].Lng
+            }
+        } else {
+            this.bestRoute.exitCoords = {
+                lat: ICCoords[tollExitIndex].Lat,
+                lng: ICCoords[tollExitIndex].Lng
+            }
+        }
+    }
+
+    findMatchingCoords(routeCoords, instruction) { 
         const size = ICZones.length;
       
         for (let i=0; i<size; i++) {
@@ -349,9 +388,7 @@ class Route {
     }
 
     isToll(string) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(string, 'text/html');
-        return doc.body.textContent.includes('Toll road');
+        return string.includes('Toll road')
     }
 
     getCurrentTime() {
@@ -359,3 +396,5 @@ class Route {
         return now.getSeconds() + now.getMinutes()*60 + now.getHours()*3600;
     } //gets current time in seconds
 }
+
+module.exports = Route
