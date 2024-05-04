@@ -20,9 +20,9 @@ global.WestWeekend = JSON.parse(fs.readFileSync('./data/407WestWeekend.JSON', 'u
 global.EastWeekday = JSON.parse(fs.readFileSync('./data/407EastWeekday.JSON', 'utf8'))
 global.WestWeekday = JSON.parse(fs.readFileSync('./data/407WestWeekday.JSON', 'utf8'))
 
-const PORT = 3000
+const PORT = process.env.PORT || 8080
 
-app.use(express.static('public'))
+app.use('/tollrouteoptimize', express.static('public'))
 app.use(express.json())
 
 app.get('/updateRoute', async (req, res) => {
@@ -38,5 +38,5 @@ app.get('/updateRoute', async (req, res) => {
 })
 
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`)
+    console.log(`Server is running on http://localhost:${PORT}/tollrouteoptimize`)
 })
